@@ -1,0 +1,91 @@
+/* ===============================
+   Quick Win – Modern Select Button
+   =============================== */
+
+.qw-select {
+    position: relative;
+    margin-bottom: 12px;
+}
+
+/* ซ่อน checkbox จริง */
+.qw-select input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+}
+
+/* ตัวปุ่ม */
+.qw-select label {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 18px;
+    border-radius: 14px;
+    border: 2px solid #e5e7eb;
+    background: #ffffff;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+/* วงเลือก */
+.qw-select label span {
+    flex: 1;
+}
+
+/* กล่องติ๊ก */
+.qw-select label::before {
+    content: "";
+    width: 24px;
+    height: 24px;
+    border-radius: 8px;
+    border: 2px solid #9ca3af;
+    background: #fff;
+    transition: all 0.25s ease;
+    flex-shrink: 0;
+}
+
+/* เครื่องหมาย ✓ */
+.qw-select label::after {
+    content: "✓";
+    position: absolute;
+    left: 24px;
+    color: #000000;
+    font-weight: bold;
+    font-size: 15px;
+    transform: scale(0);
+    transition: all 0.2s ease;
+}
+
+/* hover */
+.qw-select label:hover {
+    border-color: #dc3545;
+    background: #fff5f5;
+}
+
+/* checked */
+.qw-select input:checked + label {
+    border-color: #dc3545;
+    background: linear-gradient(135deg, #ffe4e6, #fff1f2);
+    box-shadow: 0 8px 20px rgba(220, 53, 69, 0.18);
+    font-weight: 600;
+}
+
+/* checked – กล่องติ๊ก */
+.qw-select input:checked + label::before {
+    background: #dc3545;
+    border-color: #dc3545;
+}
+
+/* checked – ✓ */
+.qw-select input:checked + label::after {
+    transform: scale(1);
+}
+
+/* mobile */
+@media (max-width: 768px) {
+    .qw-select label {
+        font-size: 0.9rem;
+        padding: 12px 14px;
+    }
+}

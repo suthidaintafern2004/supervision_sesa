@@ -1,0 +1,39 @@
+/* =========================
+   FORM SELECTOR (Tile Radio)
+   ========================= */
+
+.tile-radio {
+    padding: 22px;
+    border-radius: 16px;
+    text-align: center;
+    cursor: pointer;
+    border: 2px solid #e0e0e0;
+    transition: all 0.25s ease;
+    background: #ffffff;
+}
+
+.tile-radio:hover {
+    background: #f8f9fa;
+    border-color: #15a362;
+}
+
+.tile-radio input {
+    display: none;
+}
+
+.tile-radio.active {
+    border-color: #0d6efd;
+    background: #e9f2ff;
+    color: #0d6efd;
+    box-shadow: 0 0 10px rgba(13, 110, 253, 0.2);
+}
+
+.tile-radio i {
+    font-size: 40px;
+    margin-bottom: 10px;
+    transition: transform 0.2s ease;
+}
+
+.tile-radio.active i {
+    transform: scale(1.1);
+}

@@ -1,0 +1,83 @@
+/* =========================
+   INDEX PAGE STYLES
+   ========================= */
+
+body {
+    font-family: 'Inter', sans-serif;
+    background: url('../images/bg001.jpg') no-repeat center center fixed;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+/* Card */
+.card {
+    border-radius: 20px;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+/* Table */
+.table-custom th {
+    background-color: #ff8c42;
+    color: white;
+    font-weight: 600;
+}
+
+.table-custom tbody tr:hover {
+    background-color: rgba(255, 140, 66, 0.1);
+    transition: 0.3s;
+}
+
+/* Badge */
+.badge {
+    transition: transform 0.2s ease;
+}
+
+.badge:hover {
+    transform: scale(1.2);
+}
+
+/* Menu & Dropdown */
+.menu-btn {
+    min-width: 165px;
+}
+
+.dropdown-menu i {
+    width: 18px;
+}
+
+/* Search */
+.search-input {
+    border-radius: 50px;
+    padding-left: 40px;
+    height: 45px;
+    border: 1px solid rgba(255, 140, 66, 0.5);
+    transition: 0.3s;
+}
+
+.search-input:focus {
+    box-shadow: 0 0 10px rgba(255, 140, 66, 0.5);
+}
+
+/* Button */
+.btn-custom {
+    border-radius: 50px;
+    font-weight: 500;
+    transition: 0.3s;
+}
+
+.btn-custom:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+}
+
+/* Footer */
+footer {
+    background: #ff8c42;
+    color: white;
+    text-align: center;
+    padding: 15px 0;
+    margin-top: auto;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+}
