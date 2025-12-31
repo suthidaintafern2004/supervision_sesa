@@ -1,0 +1,97 @@
+/* =========================
+   LOGIN PAGE STYLES
+   ========================= */
+
+/* Layout */
+body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    margin: 0;
+
+    /* ใช้พื้นหลังเดียวกับหน้า index */
+    background: url('../images/bg001.jpg') no-repeat center center fixed;
+    background-size: cover;
+
+    animation: fadeIn 0.8s ease-in-out;
+}
+
+/* Fade-in Animation */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Card – Glassmorphism */
+.login-card {
+    width: 100%;
+    max-width: 420px;
+    padding: 25px;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(12px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+    transform: translateY(10px);
+    animation: slideUp 0.7s ease forwards;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Form */
+.form-control {
+    border-radius: 10px;
+    padding: 10px 14px;
+    transition: 0.25s;
+    border: 1px solid #ced4da;
+}
+
+/* Glow on Focus */
+.form-control:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 8px rgba(13, 110, 253, 0.3);
+}
+
+/* Button */
+.btn-modern {
+    background: linear-gradient(135deg, #0d6efd, #2a7bff);
+    border: none;
+    padding: 12px 0;
+    font-size: 1.1rem;
+    border-radius: 12px;
+    transition: 0.25s;
+}
+
+.btn-modern:hover {
+    background: linear-gradient(135deg, #0859d6, #1f6fe0);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(13, 110, 253, 0.3);
+}
+
+/* Title */
+.title-modern {
+    font-weight: 700;
+    font-size: 1.6rem;
+    color: #0d2c5f;
+}
+
+/* Alert */
+.alert-modern {
+    border-radius: 10px;
+    font-size: 0.95rem;
+}

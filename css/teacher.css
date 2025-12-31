@@ -1,0 +1,128 @@
+/* =========================
+   TEACHER LIST PAGE
+   ========================= */
+
+:root {
+    --bg: #fff4e6;
+    --card-bg: rgba(255, 248, 240, 0.95);
+    --primary-700: #d35400;
+    --accent: linear-gradient(135deg, #f5b041, #d35400);
+    --muted: #7f5a3c;
+}
+
+html,
+body {
+    height: 100%;
+    background: url('../images/bg001.jpg') no-repeat center center fixed;
+    background-size: cover;
+    font-family: "Inter", sans-serif;
+}
+
+/* =========================
+   LAYOUT
+   ========================= */
+
+.container-custom {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.card-custom {
+    background: var(--card-bg);
+    border-radius: 14px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+    width: 100%;
+}
+
+/* =========================
+   PAGE TITLE
+   ========================= */
+
+.page-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-weight: 700;
+    color: var(--primary-700);
+}
+
+.page-title i {
+    font-size: 28px;
+    background: linear-gradient(90deg, #ffe6cc, #ffd9b3);
+    padding: 10px;
+    border-radius: 10px;
+}
+
+/* =========================
+   SEARCH
+   ========================= */
+
+.search-input {
+    border-radius: 999px;
+    padding-left: 44px;
+    height: 46px;
+    border: 1px solid rgba(211, 84, 0, 0.2);
+}
+
+.search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--primary-700);
+}
+
+/* =========================
+   TABLE
+   ========================= */
+
+.table thead th {
+    background-color: #ffd8b1;
+    color: #7f5a3c;
+    border: none;
+    white-space: nowrap;
+}
+
+.table tbody tr {
+    background: rgba(255, 240, 220, 0.85);
+    transition: 0.1s;
+}
+
+/* =========================
+   BUTTONS
+   ========================= */
+
+.btn-gradient {
+    background: linear-gradient(90deg, #f5b041, #d35400);
+    color: white;
+    border: none;
+}
+
+.btn-edit {
+    background: linear-gradient(90deg, #f8c471, #f39c12);
+    border: none;
+    color: white;
+}
+
+/* =========================
+   LOADING / SCROLL
+   ========================= */
+
+#loading {
+    display: none;
+    text-align: center;
+    padding: 20px;
+    font-weight: bold;
+    color: var(--primary-700);
+}
+
+.table-responsive::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.table-responsive::-webkit-scrollbar-thumb {
+    background-color: rgba(211, 84, 0, 0.3);
+    border-radius: 4px;
+}

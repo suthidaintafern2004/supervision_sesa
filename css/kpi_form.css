@@ -1,0 +1,110 @@
+/* =============================
+   KPI FORM - RADIO SCORE STYLE
+   ============================= */
+
+.rating-radio-item .form-check-input {
+    display: none;
+}
+
+.rating-radio-item .form-check-label {
+    display: inline-block;
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    border: 2px solid #ced4da;
+    background-color: #fff;
+    color: #495057;
+    text-align: center;
+    line-height: 41px;
+    font-size: 1.2rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+    user-select: none;
+}
+
+.rating-radio-item .form-check-label:hover {
+    background-color: #e9ecef;
+    border-color: #adb5bd;
+}
+
+.rating-radio-item .form-check-input:checked + .form-check-label {
+    color: #fff;
+    box-shadow: 0 0 0 0.2rem rgba(13,110,253,.25);
+}
+
+/* คะแนนแต่ละระดับ */
+.rating-radio-item input[value="3"]:checked + label {
+    background-color: #198754;
+    border-color: #146c43;
+}
+
+.rating-radio-item input[value="2"]:checked + label {
+    background-color: #0dcaf0;
+    border-color: #0aa3c2;
+}
+
+.rating-radio-item input[value="1"]:checked + label {
+    background-color: #ffc107;
+    border-color: #d39e00;
+    color: #000;
+}
+
+.rating-radio-item input[value="0"]:checked + label {
+    background-color: #dc3545;
+    border-color: #b02a37;
+}
+
+/* =============================
+   IMAGE PREVIEW
+   ============================= */
+
+.img-preview-wrapper {
+    position: relative;
+    width: 150px;
+    height: 150px;
+    border: 2px dashed #ccc;
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.img-preview-wrapper img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: cover;
+}
+
+.remove-btn {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background: rgba(220,53,69,0.9);
+    color: #fff;
+    border: none;
+    border-radius: 50%;
+    width: 25px;
+    height: 25px;
+    cursor: pointer;
+}
+
+/* =============================
+   IMAGE GALLERY (OPTIONAL)
+   ============================= */
+
+.image-gallery {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin-top: 20px;
+}
+
+.image-item {
+    border: 1px solid #ddd;
+    padding: 10px;
+    border-radius: 5px;
+    text-align: center;
+    position: relative;
+}

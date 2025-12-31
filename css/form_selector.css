@@ -1,0 +1,62 @@
+/* =========================
+   FORM SELECTOR (Tile Radio)
+   ========================= */
+
+.tile-radio {
+    position: relative;
+    padding: 32px;
+    border-radius: 18px;
+    text-align: center;
+    cursor: pointer;
+    border: 2px solid #e0e0e0;
+    transition: all 0.25s ease;
+    background: #ffffff;
+}
+
+/* hover */
+.tile-radio:hover {
+    background: #f8f9fa;
+    border-color: #15a362;
+}
+
+/* =========================
+   RADIO (ซ่อน แต่ยังทำงาน)
+   ========================= */
+
+.tile-radio input[type="radio"] {
+    display: none !important;
+}
+
+.tile-radio input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* เมื่อเลือก */
+.tile-radio.active {
+    border-color: #0d6efd;
+    background: #e9f2ff;
+    color: #0d6efd;
+    box-shadow: 0 0 12px rgba(13, 110, 253, 0.25);
+}
+
+/* =========================
+   ICON
+   ========================= */
+
+.tile-radio i {
+    font-size: 64px;
+    margin-bottom: 14px;
+    transition: transform 0.25s ease;
+}
+
+/* hover icon */
+.tile-radio:hover i {
+    transform: scale(1.08);
+}
+
+/* active icon */
+.tile-radio.active i {
+    transform: scale(1.15);
+}

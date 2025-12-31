@@ -1,0 +1,130 @@
+/* =========================
+   SUPERVISOR LIST PAGE
+   ========================= */
+
+:root {
+    --bg: #f3f6fb;
+    --card-bg: rgba(255, 255, 255, 0.75);
+    --primary-600: #0d6efd;
+    --primary-700: #0056d6;
+    --accent: linear-gradient(135deg, #0069d9, #0053ba);
+}
+
+/* =========================
+   GLOBAL
+   ========================= */
+
+html, body {
+    height: 100%;
+}
+
+body {
+    background: url('../images/bg001.jpg') no-repeat center center fixed;
+    background-size: cover;
+    font-family: "Inter", sans-serif;
+    overflow: hidden;
+}
+
+/* =========================
+   LAYOUT
+   ========================= */
+
+.container {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    padding-bottom: 20px;
+}
+
+.card-custom {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: var(--card-bg);
+    border-radius: 14px;
+    box-shadow: 0 8px 30px rgba(31, 45, 61, 0.08);
+    overflow: hidden;
+}
+
+/* =========================
+   PAGE TITLE
+   ========================= */
+
+.page-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-weight: 700;
+    color: var(--primary-700);
+}
+
+.page-title i {
+    font-size: 28px;
+    background: linear-gradient(90deg, #e6f0ff, #d9e8ff);
+    padding: 10px;
+    border-radius: 10px;
+}
+
+/* =========================
+   SEARCH
+   ========================= */
+
+.search-input {
+    border-radius: 999px;
+    padding-left: 44px;
+    height: 46px;
+    border: 1px solid rgba(13, 110, 253, 0.08);
+}
+
+.search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--primary-700);
+}
+
+/* =========================
+   TABLE
+   ========================= */
+
+.table-container {
+    flex: 1;
+    overflow-y: auto;
+    padding-bottom: 20px;
+}
+
+.table thead th {
+    background: var(--accent);
+    color: white;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+/* =========================
+   BUTTONS
+   ========================= */
+
+.btn-gradient {
+    background: linear-gradient(90deg, #007bff, #0056d6);
+    color: white;
+    border: none;
+}
+
+.btn-edit {
+    background: linear-gradient(90deg, #ffcd39, #ffb21f);
+    border: none;
+}
+
+/* =========================
+   LOADING
+   ========================= */
+
+#loading {
+    display: none;
+    text-align: center;
+    padding: 20px;
+    color: var(--primary-700);
+    font-weight: bold;
+}

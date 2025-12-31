@@ -1,0 +1,133 @@
+/* ===============================
+   Satisfaction Form - Modern UI
+================================ */
+
+/* พื้นหลัง */
+body {
+    background: linear-gradient(135deg, #f8f9fa, #eef3f8);
+}
+
+/* Card หลัก */
+.satisfaction-card {
+    border-radius: 20px;
+    border: none;
+    background: #ffffff;
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.08);
+}
+
+/* Header */
+.satisfaction-header {
+    border-radius: 20px 20px 0 0;
+    background: linear-gradient(135deg, #ffc107, #ffda6a);
+    color: #212529;
+}
+
+/* กล่องข้อมูลผู้นิเทศ */
+.info-box {
+    border-radius: 15px;
+    background: #f1f7ff;
+    border-left: 6px solid #0d6efd;
+}
+
+/* Card คำถาม */
+.question-card {
+    border-radius: 16px;
+    border: 1px solid #e9ecef;
+    transition: all 0.25s ease;
+}
+
+.question-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+}
+
+/* เลขข้อ */
+.question-number {
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, #0d6efd, #6ea8fe);
+    color: #fff;
+    font-weight: bold;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 10px;
+}
+
+/* คำถาม */
+.form-label-question {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #212529;
+}
+
+/* ===============================
+   Rating Button
+================================ */
+.rating-radio-item .form-check-input {
+    display: none;
+}
+
+.rating-radio-item .form-check-label {
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    border: 2px solid #ced4da;
+    background: #fff;
+    color: #495057;
+    font-size: 1.1rem;
+    font-weight: bold;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+/* Hover */
+.rating-radio-item .form-check-label:hover {
+    transform: scale(1.1);
+    background: #f1f3f5;
+}
+
+/* Checked */
+.rating-radio-item .form-check-input:checked + label {
+    color: #fff;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+/* สีคะแนน */
+.rating-radio-item input[value="5"]:checked + label {
+    background: #198754;
+    border-color: #198754;
+}
+
+.rating-radio-item input[value="4"]:checked + label {
+    background: #0dcaf0;
+    border-color: #0dcaf0;
+}
+
+.rating-radio-item input[value="3"]:checked + label {
+    background: #ffc107;
+    border-color: #ffc107;
+    color: #000;
+}
+
+.rating-radio-item input[value="2"]:checked + label {
+    background: #fd7e14;
+    border-color: #fd7e14;
+}
+
+.rating-radio-item input[value="1"]:checked + label {
+    background: #dc3545;
+    border-color: #dc3545;
+}
+
+/* ปุ่มบันทึก */
+.btn-submit {
+    border-radius: 30px;
+    padding: 12px 40px;
+    font-size: 1.1rem;
+    box-shadow: 0 8px 20px rgba(25, 135, 84, 0.3);
+}

@@ -1,0 +1,95 @@
+/* ===============================
+   ตารางรายชื่อครู – โทนร้อน เรียบ
+   =============================== */
+
+.teacher-table {
+    border-radius: 12px;
+    overflow: hidden;
+    background-color: #ffffff;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+}
+
+/* ===== หัวตาราง ===== */
+.teacher-table thead th {
+    background-color: #f59e0b; /* ส้มโทนอำพัน */
+    color: #ffffff;
+    font-weight: 600;
+    font-size: 0.95rem;
+    text-align: center;
+    padding: 14px 12px;
+    border: none;
+    white-space: nowrap;
+}
+
+/* ===== แถวข้อมูล ===== */
+.teacher-table tbody td {
+    padding: 14px 12px;
+    vertical-align: middle;
+    border-bottom: 1px solid #f3f3f3;
+    font-size: 0.95rem;
+    color: #333333;
+}
+
+/* ===== Hover effect ===== */
+.teacher-table tbody tr {
+    transition: background-color 0.25s ease;
+}
+
+.teacher-table tbody tr:hover {
+    background-color: #fff7ed; /* ครีมอ่อน */
+}
+
+/* ===== Badge จำนวนครั้ง ===== */
+.teacher-table .badge {
+    background-color: #fde68a;
+    color: #92400e;
+    padding: 6px 14px;
+    font-size: 0.9rem;
+    border-radius: 20px;
+    font-weight: 600;
+}
+
+/* ===== ปุ่มดูประวัติ ===== */
+.teacher-table .btn-info {
+    background-color: #fb923c;
+    border: none;
+    color: #ffffff;
+    border-radius: 18px;
+    padding: 6px 14px;
+    font-size: 0.85rem;
+    transition: all 0.25s ease;
+}
+
+.teacher-table .btn-info:hover {
+    background-color: #f97316;
+    transform: translateY(-1px);
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 768px) {
+    .teacher-table thead {
+        display: none;
+    }
+
+    .teacher-table tbody tr {
+        display: block;
+        margin-bottom: 14px;
+        border-radius: 10px;
+        background-color: #ffffff;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+        padding: 10px;
+    }
+
+    .teacher-table tbody td {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 10px;
+        border-bottom: none;
+    }
+
+    .teacher-table tbody td::before {
+        content: attr(data-label);
+        font-weight: 600;
+        color: #9a3412;
+    }
+}

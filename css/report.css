@@ -1,0 +1,138 @@
+/* =========================
+   REPORT PAGE STYLES
+   ========================= */
+
+body {
+    background-color: #f8f9fa;
+    font-family: 'Sarabun', sans-serif;
+}
+
+/* Card */
+.card {
+    border-radius: 15px;
+    border: none;
+}
+
+.card-header {
+    border-radius: 15px 15px 0 0 !important;
+}
+
+/* Back Button */
+.fixed-back-btn {
+    position: fixed;
+    top: 15px;
+    left: 15px;
+    z-index: 1050;
+}
+
+/* Image Gallery */
+.img-gallery {
+    height: 200px;
+    width: 100%;
+    object-fit: cover;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: 0.3s;
+    border: 1px solid #ddd;
+}
+
+.img-gallery:hover {
+    transform: scale(1.03);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+}
+
+/* Table */
+.table-score th {
+    background-color: #f1f4f9;
+    color: #333;
+}
+
+/* Suggestion */
+.suggestion-box {
+    background-color: #fff3cd;
+    border-left: 5px solid #ffc107;
+    padding: 15px;
+    border-radius: 5px;
+}
+
+/* Score Circle */
+.score-circle {
+    display: inline-block;
+    width: 32px;
+    height: 32px;
+    line-height: 32px;
+    border-radius: 50%;
+    font-weight: bold;
+    color: white;
+    text-align: center;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.score-3 { background-color: #198754; }   /* เขียว */
+.score-2 { background-color: #ffc107; color: black; } /* เหลือง */
+.score-1 { background-color: #d63384; }   /* ชมพู */
+.score-0 { background-color: #dc3545; }   /* แดง */
+
+/* =========================
+   PRINT SETTINGS (A4)
+   ========================= */
+@media print {
+
+    @page {
+        size: A4;
+        margin: 1cm;
+    }
+
+    .no-print,
+    .fixed-back-btn {
+        display: none !important;
+    }
+
+    .container,
+    .row,
+    .col-lg-10 {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    .card {
+        box-shadow: none !important;
+        border: none !important;
+        width: 100% !important;
+        background-color: #fff !important;
+        display: block !important;
+    }
+
+    .card-body {
+        background-color: #fff !important;
+    }
+
+    /* Force print colors */
+    * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    body {
+        background-image: none !important;
+        background-color: #fff !important;
+        width: 100%;
+    }
+
+    /* Smart Page Break */
+    .kpi-card {
+        page-break-inside: avoid;
+        break-inside: avoid;
+        page-break-before: auto;
+        break-before: auto;
+        margin-bottom: 20px !important;
+        border: 1px solid #ddd !important;
+        display: block !important;
+    }
+
+    tr {
+        page-break-inside: avoid;
+    }
+}
