@@ -37,6 +37,7 @@ try {
             s.p_id,
             s.fname,
             s.lname,
+            s.role,
             p.prefix_name,
             o.office_name,
             pos.position_name,
@@ -71,6 +72,7 @@ try {
     // เก็บข้อมูลลง SESSION
     // ------------------------------------------------------------
     $_SESSION['user_id']        = $user['p_id'];
+    $_SESSION['role']           = strtolower(trim($user['role']));
     $_SESSION['user_name']      = $full_name;
     $_SESSION['office_name']    = $user['office_name'] ?? '';
     $_SESSION['position_name']  = $user['position_name'] ?? '';

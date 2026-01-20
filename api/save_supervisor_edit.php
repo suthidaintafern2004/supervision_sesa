@@ -7,6 +7,18 @@
 session_start();
 require_once '../config/db_connect.php';
 
+// ⭐ เพิ่มส่วนนี้
+if (
+    !isset($_SESSION['is_logged_in']) ||
+    $_SESSION['role'] !== 'admin'
+) {
+    echo json_encode([
+        'success' => false,
+        'message' => 'Unauthorized'
+    ]);
+    exit;
+}
+
 // ต้องล็อกอินก่อน
 if (!isset($_SESSION['is_logged_in']) || $_SESSION['is_logged_in'] !== true) {
     echo "<script>alert('กรุณาเข้าสู่ระบบก่อน'); window.location.href='../login.php';</script>";

@@ -1,16 +1,16 @@
 <?php
-// forms/save_quickwin_data.php
+/* ==================================================
+   save_quickwin_data.php
+   รองรับ Quick Win + อัปโหลดรูป
+   ================================================== */
 
-/* =========================
-   1. ตรวจสอบ Session
-   ========================= */
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
 /* =========================
-   2. เชื่อมต่อฐานข้อมูล
-   ========================= */
+   เชื่อมต่อฐานข้อมูล
+========================= */
 if (file_exists('../config/db_connect.php')) {
     require_once '../config/db_connect.php';
 } elseif (file_exists('config/db_connect.php')) {
@@ -18,33 +18,40 @@ if (file_exists('../config/db_connect.php')) {
 }
 
 /* =========================
-   3. ฟังก์ชัน redirect + flash message
-   ========================= */
-function redirect_with_flash_message($message, $location = '../index.php', $type = 'danger')
+   โฟลเดอร์อัปโหลดรูป
+========================= */
+$uploadDir = __DIR__ . '/../uploads/quickwin/';
+if (!is_dir($uploadDir)) {
+    mkdir($uploadDir, 0755, true);
+}
+
+/* =========================
+   ฟังก์ชัน redirect + flash
+========================= */
+function redirect_with_flash_message($message, $location, $type = 'warning')
 {
     $_SESSION['flash_message'] = $message;
-    $_SESSION['flash_type']    = $type; // success | warning | danger | info
-    header("Location: $location");
+    $_SESSION['flash_type']    = $type;
+    header("Location: {$location}");
     exit();
 }
 
 /* =========================
-   4. ฟังก์ชันคำนวณปีการศึกษา (คิดจากเดือน)
-   =========================
-   - ม.ค.–เม.ย.  => ปีการศึกษาก่อนหน้า
-   - พ.ค.–ธ.ค.  => ปีการศึกษาปัจจุบัน
-*/
+   ฟังก์ชันคำนวณปีการศึกษา
+========================= */
 function getAcademicYear($date)
 {
     $year  = (int)date('Y', strtotime($date));
-    $month = (int)date('m', strtotime($date));
+    $month = (int)date('n', strtotime($date));
 
-    return ($month < 5) ? $year - 1 : $year;
+    return ($month >= 5)
+        ? $year + 543
+        : $year + 542;
 }
 
 /* =========================
-   5. ตรวจสอบ Method
-   ========================= */
+   ตรวจสอบ Method
+========================= */
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Location: ../index.php');
     exit();
@@ -52,57 +59,50 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 if (!isset($_SESSION['inspection_data'])) {
     redirect_with_flash_message(
-        "Session หมดอายุ กรุณาทำรายการใหม่",
-        "../index.php",
-        "warning"
+        'Session หมดอายุ กรุณาทำรายการใหม่',
+        '../index.php',
+        'warning'
     );
 }
 
 /* =========================
-   6. รับค่าจากฟอร์ม
-   ========================= */
+   รับค่าจากฟอร์ม
+========================= */
 $p_id         = trim($_POST['supervisor_p_id'] ?? '');
 $t_id         = trim($_POST['teacher_t_pid'] ?? '');
 $option_ids   = $_POST['option_ids'] ?? [];
 $option_other = trim($_POST['option_other'] ?? '');
 
-$supervision_date =
-    ($_POST['supervision_date'] ?? date('Y-m-d')) . ' ' . date('H:i:s');
+$supervision_date = date('Y-m-d H:i:s');
 
 /* =========================
-   7. Validation
-   ========================= */
+   Validation
+========================= */
 if (
     $p_id === '' ||
     $t_id === '' ||
     (empty($option_ids) && $option_other === '')
 ) {
     redirect_with_flash_message(
-        "กรุณาเลือกหัวข้อ Quick Win อย่างน้อย 1 ข้อ หรือระบุหัวข้ออื่นๆ",
-        "../index.php",
-        "warning"
+        'กรุณาเลือกหัวข้อ Quick Win อย่างน้อย 1 ข้อ หรือระบุหัวข้ออื่น ๆ',
+        'quickwin_form.php',
+        'warning'
     );
 }
 
 /* =========================
-   8. คำนวณปีการศึกษา
-   ========================= */
+   คำนวณปีการศึกษา
+========================= */
 $academic_year = getAcademicYear($supervision_date);
 
 /* =========================
-   9. ตรวจสอบ Quick Win ซ้ำในปีการศึกษาเดียวกัน
-   ========================= */
+   ตรวจสอบ Quick Win ซ้ำ
+========================= */
 $check_sql = "
     SELECT COUNT(*)
     FROM quick_win
     WHERE t_pid = :t_pid
-      AND (
-            CASE
-                WHEN MONTH(supervision_date) < 5
-                THEN YEAR(supervision_date) - 1
-                ELSE YEAR(supervision_date)
-            END
-          ) = :academic_year
+      AND academic_year = :academic_year
 ";
 
 $check_stmt = $conn->prepare($check_sql);
@@ -111,33 +111,35 @@ $check_stmt->execute([
     ':academic_year' => $academic_year
 ]);
 
+
 if ($check_stmt->fetchColumn() > 0) {
     redirect_with_flash_message(
         "ครูท่านนี้ได้รับการนิเทศ Quick Win ปีการศึกษา {$academic_year} แล้ว",
-        "../index.php",
-        "warning"
+        '../index.php',
+        'warning'
     );
 }
 
 /* =========================
-   10. เตรียมข้อมูลบันทึก
-   ========================= */
+   เตรียมข้อมูลบันทึก
+========================= */
 $options_str = !empty($option_ids)
     ? implode('/', $option_ids)
     : '';
 
 /* =========================
-   11. บันทึกข้อมูล
-   ========================= */
+   บันทึกข้อมูล + รูป
+========================= */
 try {
     $conn->beginTransaction();
 
+    /* ---------- 1) บันทึก quick_win ---------- */
     $sql = "
         INSERT INTO quick_win
-            (p_id, t_pid, options, option_other, supervision_date)
-        VALUES
-            (:pid, :tid, :opt, :other, :sdate)
-    ";
+            (p_id, t_pid, options, option_other, supervision_date, academic_year)
+            VALUES
+            (:pid, :tid, :opt, :other, :sdate, :ay)
+                ";
 
     $stmt = $conn->prepare($sql);
     $stmt->execute([
@@ -145,26 +147,72 @@ try {
         ':tid'   => $t_id,
         ':opt'   => $options_str,
         ':other' => $option_other,
-        ':sdate' => $supervision_date
+        ':sdate' => $supervision_date,
+        ':ay'    => $academic_year
     ]);
 
+    $quickwin_id = $conn->lastInsertId();
+
+    /* ---------- 2) อัปโหลดรูป (ถ้ามี) ---------- */
+    if (!empty($_FILES['quickwin_images']['name'][0])) {
+
+        $allowedExt = ['jpg', 'jpeg', 'png'];
+
+        foreach ($_FILES['quickwin_images']['name'] as $index => $name) {
+
+            if ($_FILES['quickwin_images']['error'][$index] !== UPLOAD_ERR_OK) {
+                continue;
+            }
+
+            $tmpName = $_FILES['quickwin_images']['tmp_name'][$index];
+            $size    = $_FILES['quickwin_images']['size'][$index];
+            $ext     = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+
+            if (!in_array($ext, $allowedExt) || $size > 5 * 1024 * 1024) {
+                continue;
+            }
+
+            $newFileName =
+                'qw_' . $quickwin_id . '_' . time() . '_' . rand(1000, 9999) . '.' . $ext;
+
+            if (move_uploaded_file($tmpName, $uploadDir . $newFileName)) {
+
+                $imgSql = "
+                    INSERT INTO images
+                        (supervisor_p_id, teacher_t_pid, subject_code, inspection_time, file_name, academic_year)
+                    VALUES
+                        (:pid, :tid, NULL, NULL, :fname, :ay)
+                ";
+
+                $imgStmt = $conn->prepare($imgSql);
+                $imgStmt->execute([
+                    ':pid'   => $p_id,
+                    ':tid'   => $t_id,
+                    ':fname' => $newFileName,
+                    ':ay'    => $academic_year
+                ]);
+            }
+        }
+    }
+
+    /* ---------- 3) commit ---------- */
     $conn->commit();
 
     unset($_SESSION['inspection_data']);
 
     redirect_with_flash_message(
-        "บันทึกข้อมูล Quick Win ปีการศึกษา {$academic_year} เรียบร้อยแล้ว",
-        "../index.php",
-        "success"
+        "บันทึก Quick Win ปีการศึกษา {$academic_year} สำเร็จ",
+        '../index.php',
+        'success'
     );
-
 } catch (PDOException $e) {
+
     $conn->rollBack();
-    error_log("Save QuickWin Error: " . $e->getMessage());
+    error_log('QuickWin Save Error: ' . $e->getMessage());
 
     redirect_with_flash_message(
-        "เกิดข้อผิดพลาดในการบันทึกข้อมูล กรุณาติดต่อผู้ดูแลระบบ",
-        "../index.php",
-        "danger"
+        'เกิดข้อผิดพลาดในการบันทึกข้อมูล',
+        'quickwin_form.php',
+        'danger'
     );
 }

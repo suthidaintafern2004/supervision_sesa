@@ -1,7 +1,20 @@
 <?php
 // File: api/delete_supervisor.php
 header('Content-Type: application/json; charset=utf-8');
+session_start(); // ⭐ เพิ่ม
 require_once '../config/db_connect.php';
+
+// ⭐ เพิ่มส่วนนี้
+if (
+    !isset($_SESSION['is_logged_in']) ||
+    $_SESSION['role'] !== 'admin'
+) {
+    echo json_encode([
+        'success' => false,
+        'message' => 'Unauthorized'
+    ]);
+    exit;
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $p_id = $_POST['p_id'] ?? '';

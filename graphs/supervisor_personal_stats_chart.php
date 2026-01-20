@@ -97,12 +97,40 @@ $schools = $schoolStmt->fetchAll(PDO::FETCH_ASSOC);
 
     <style>
         body {
-            background-color: #f4f6f9;
-            font-family: 'Segoe UI', sans-serif;
+            background-color: #f8f9fa;
+            background-image: url('../images/bg001.jpg');
+            background-size: cover;
+            background-attachment: fixed;
         }
 
         h4 {
             font-weight: 600;
+        }
+
+        /* ===============================
+            Dashboard Header
+        =============================== */
+        .dashboard-header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(4px);
+            border-radius: 18px;
+            padding: 18px 24px;
+            margin-bottom: 24px;
+
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+            border-left: 6px solid #0d6efd;
+        }
+
+        .dashboard-header h2,
+        .dashboard-header h4 {
+            margin: 0;
+            font-weight: 700;
+            color: #212529;
+        }
+
+        .dashboard-header small {
+            color: #6c757d;
+            font-weight: 500;
         }
 
         .card {
@@ -140,6 +168,11 @@ $schools = $schoolStmt->fetchAll(PDO::FETCH_ASSOC);
             box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2);
             color: white;
         }
+
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(4px);
+        }
     </style>
 </head>
 
@@ -151,23 +184,28 @@ $schools = $schoolStmt->fetchAll(PDO::FETCH_ASSOC);
     </div>
     <div class="container py-4">
 
-        <!-- Header -->
-        <h4 class="mb-4">
-            📊 Dashboard สถิติการนิเทศรายบุคคล<br>
-            <small class="text-muted">ศน. <?= htmlspecialchars($supervisor['fullname'] ?? '-') ?></small>
-        </h4>
-
-        <!-- =========================
-         กราฟที่ 1 : ภาพรวม
-    ========================== -->
-        <div class="card shadow-sm mb-4">
+        <div class="card shadow-lg mb-5 dashboard-main-card">
             <div class="card-body">
-                <div class="chart-title">ภาพรวมการนิเทศ</div>
+
+                <!-- ===== Header ===== -->
+                <div class="dashboard-header-inner mb-4">
+                    <h2 class="mb-1">
+                        📊 Dashboard สถิติการนิเทศรายบุคคล
+                    </h2>
+                    <small>
+                        ศน. <?= htmlspecialchars($supervisor['fullname'] ?? '-') ?>
+                    </small>
+                </div>
+
+                <!-- ===== Graph 1 ===== -->
+                <div class="chart-title mt-3">ภาพรวมการนิเทศ</div>
                 <div class="chart-container">
                     <canvas id="summaryChart"></canvas>
                 </div>
+
             </div>
         </div>
+
 
         <!-- =========================
          กราฟที่2  : โรงเรียน

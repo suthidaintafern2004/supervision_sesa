@@ -2,6 +2,11 @@
 session_start();
 require_once 'config/db_connect.php';
 
+$allow_supervisor_admin = (
+    isset($_SESSION['role']) &&
+    $_SESSION['role'] === 'admin'
+);
+
 // --- ส่วนโลจิกนับจำนวนผู้เข้าชม (คงเดิม) ---
 if (!isset($_COOKIE['site_visited'])) {
     $update = $conn->prepare("UPDATE site_views SET total_views = total_views + 1");
@@ -12,12 +17,6 @@ if (!isset($_COOKIE['site_visited'])) {
 $stmt = $conn->prepare("SELECT total_views FROM site_views LIMIT 1");
 $stmt->execute();
 $views = $stmt->fetchColumn();
-
-if (!isset($_SESSION['visited'])) {
-    unset($_SESSION['is_logged_in']);
-    unset($_SESSION['user_id']);
-    $_SESSION['visited'] = true;
-}
 
 // --- ส่วนการตั้งค่า Pagination (เพิ่มเติม) ---
 $limit = 50; // จำนวนรายการต่อหน้า
@@ -30,7 +29,7 @@ $results = [];
 try {
     // 1. หาจำนวนรายการทั้งหมดสำหรับแบ่งหน้า
     $count_sql = "SELECT COUNT(t.t_pid) FROM teacher t 
-                  WHERE (t.t_pid IN (SELECT teacher_t_pid FROM supervision_sessions) 
+                  WHERE (t.t_pid IN (SELECT teacher_t_pid FROM supervision_sessions WHERE deleted_at IS NULL) 
                   OR t.t_pid IN (SELECT t_pid FROM quick_win))";
     $count_params = [];
 
@@ -51,10 +50,14 @@ try {
                 CONCAT(IFNULL(p.prefix_name,''), t.f_name, ' ', t.l_name) AS teacher_full_name,
                 pos.position_name AS teacher_position,
                 s.school_name AS t_school,
-                (SELECT COUNT(*) FROM supervision_sessions WHERE teacher_t_pid = t.t_pid) AS count_normal,
+                (SELECT COUNT(*) FROM supervision_sessions WHERE teacher_t_pid = t.t_pid AND deleted_at IS NULL) AS count_normal,
                 (SELECT COUNT(*) FROM quick_win WHERE t_pid = t.t_pid) AS count_quickwin,
                 GREATEST(
-                    IFNULL((SELECT MAX(supervision_date) FROM supervision_sessions WHERE teacher_t_pid = t.t_pid), '0000-00-00'),
+                    IFNULL((SELECT MAX(supervision_date)
+                        FROM supervision_sessions
+                        WHERE teacher_t_pid = t.t_pid
+                        AND deleted_at IS NULL
+                        ), '0000-00-00'),
                     IFNULL((SELECT MAX(supervision_date) FROM quick_win WHERE t_pid = t.t_pid), '0000-00-00')
                 ) AS latest_date
             FROM teacher t
@@ -62,7 +65,11 @@ try {
             LEFT JOIN school s ON t.school_id = s.school_id
             LEFT JOIN position pos ON t.position_id = pos.position_id
             WHERE (
-                t.t_pid IN (SELECT teacher_t_pid FROM supervision_sessions)
+                t.t_pid IN (
+                    SELECT teacher_t_pid
+                    FROM supervision_sessions
+                    WHERE deleted_at IS NULL
+            )
                 OR 
                 t.t_pid IN (SELECT t_pid FROM quick_win)
             )";
@@ -130,6 +137,29 @@ try {
                         <i class="fas fa-clipboard-list me-2"></i> บันทึกการนิเทศ
                     </a>
 
+                    <!-- ปุ่มแก้ไขข้อมูล -->
+                    <?php if ($allow_supervisor_admin): ?>
+                        <div class="btn-group">
+                            <button class="btn btn-custom btn-primary dropdown-toggle" data-bs-toggle="dropdown">
+                                <i class="fas fa-edit me-1"></i> แก้ไขข้อมูล
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                                <li>
+                                    <a class="dropdown-item" href="my_sessions_list.php">
+                                        <i class="fas fa-list text-primary me-2"></i>
+                                        รายการที่ฉันบันทึก
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" href="trash/index.php">
+                                        <i class="fas fa-trash text-danger me-2"></i>
+                                        ถังขยะ
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
+                    <?php endif; ?>
+
                     <!-- ปุ่ม Dashboard -->
                     <div class="btn-group">
                         <button class="btn btn-custom btn-info dropdown-toggle" data-bs-toggle="dropdown">
@@ -156,22 +186,38 @@ try {
 
                     <!-- ปุ่มจัดการข้อมูล -->
                     <div class="btn-group">
-                        <button class="btn btn-custom btn-success dropdown-toggle" data-bs-toggle="dropdown">
+                        <button class="btn btn-custom btn-success dropdown-toggle"
+                            data-bs-toggle="dropdown">
                             <i class="fas fa-cogs me-1"></i> จัดการข้อมูล
                         </button>
+
                         <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+
+                            <!-- ข้อมูลครู (ทุกคนที่ล็อกอินเข้าได้) -->
                             <li>
                                 <a class="dropdown-item" href="edit_teacher_list.php">
                                     <i class="fas fa-user-edit text-primary me-2"></i> ข้อมูลครู
                                 </a>
                             </li>
-                            <li>
-                                <a class="dropdown-item" href="edit_supervisor_list.php">
-                                    <i class="fas fa-user-tie text-success me-2"></i> ข้อมูลผู้นิเทศ
-                                </a>
-                            </li>
+
+                            <!-- ข้อมูลผู้นิเทศ (เฉพาะ admin) -->
+                            <?php if ($allow_supervisor_admin): ?>
+                                <li>
+                                    <a class="dropdown-item" href="edit_supervisor_list.php">
+                                        <i class="fas fa-user-tie text-success me-2"></i> ข้อมูลผู้นิเทศ
+                                    </a>
+                                </li>
+                            <?php else: ?>
+                                <li>
+                                    <a class="dropdown-item" href="#" onclick="denyAccess(event)">
+                                        <i class="fas fa-user-tie text-success me-2"></i> ข้อมูลผู้นิเทศ
+                                    </a>
+                                </li>
+                            <?php endif; ?>
+
                         </ul>
                     </div>
+
 
                     <a href="logout.php" class="btn btn-custom btn-danger">
                         <i class="fas fa-sign-out-alt me-1"></i> ออกจากระบบ
@@ -237,68 +283,58 @@ try {
                 </table>
             </div>
 
-        <?php if ($total_pages > 1): ?>
-            <nav aria-label="Page navigation" class="mt-4">
-                <ul class="pagination justify-content-center">
-                    <li class="page-item <?= ($page <= 1) ? 'disabled' : '' ?>">
-                        <a class="page-link" href="?page=1&search_name=<?= urlencode($search_name) ?>#search-results">หน้าแรก</a>
-                    </li>
+            <?php if ($total_pages > 1): ?>
+                <nav aria-label="Page navigation" class="mt-4">
+                    <ul class="pagination justify-content-center">
+                        <li class="page-item <?= ($page <= 1) ? 'disabled' : '' ?>">
+                            <a class="page-link" href="?page=1&search_name=<?= urlencode($search_name) ?>#search-results">หน้าแรก</a>
+                        </li>
 
-                    <li class="page-item <?= ($page <= 1) ? 'disabled' : '' ?>">
-                        <a class="page-link" href="?page=<?= $page - 1 ?>&search_name=<?= urlencode($search_name) ?>#search-results">ก่อนหน้า</a>
-                    </li>
+                        <li class="page-item <?= ($page <= 1) ? 'disabled' : '' ?>">
+                            <a class="page-link" href="?page=<?= $page - 1 ?>&search_name=<?= urlencode($search_name) ?>#search-results">ก่อนหน้า</a>
+                        </li>
 
-                    <?php
-                    // แสดงเลขหน้าแบบจำกัดช่วง (เพื่อไม่ให้ยาวเกินไป)
-                    $range = 2;
-                    for ($i = 1; $i <= $total_pages; $i++):
-                        if ($i == 1 || $i == $total_pages || ($i >= $page - $range && $i <= $page + $range)): ?>
-                            <li class="page-item <?= ($page == $i) ? 'active' : '' ?>">
-                                <a class="page-link" href="?page=<?= $i ?>&search_name=<?= urlencode($search_name) ?>#search-results"><?= $i ?></a>
-                            </li>
-                        <?php elseif ($i == $page - $range - 1 || $i == $page + $range + 1): ?>
-                            <li class="page-item disabled"><span class="page-link">...</span></li>
-                    <?php endif;
-                    endfor; ?>
+                        <?php
+                        // แสดงเลขหน้าแบบจำกัดช่วง (เพื่อไม่ให้ยาวเกินไป)
+                        $range = 2;
+                        for ($i = 1; $i <= $total_pages; $i++):
+                            if ($i == 1 || $i == $total_pages || ($i >= $page - $range && $i <= $page + $range)): ?>
+                                <li class="page-item <?= ($page == $i) ? 'active' : '' ?>">
+                                    <a class="page-link" href="?page=<?= $i ?>&search_name=<?= urlencode($search_name) ?>#search-results"><?= $i ?></a>
+                                </li>
+                            <?php elseif ($i == $page - $range - 1 || $i == $page + $range + 1): ?>
+                                <li class="page-item disabled"><span class="page-link">...</span></li>
+                        <?php endif;
+                        endfor; ?>
 
-                    <li class="page-item <?= ($page >= $total_pages) ? 'disabled' : '' ?>">
-                        <a class="page-link" href="?page=<?= $page + 1 ?>&search_name=<?= urlencode($search_name) ?>#search-results">ถัดไป</a>
-                    </li>
-                </ul>
-            </nav>
-            <div class="text-center text-muted small mt-2">
-                หน้า <?= $page ?> จาก <?= $total_pages ?> (รวมทั้งหมด <?= number_format($total_rows) ?> รายการ)
-            </div>
-        <?php endif; ?>
+                        <li class="page-item <?= ($page >= $total_pages) ? 'disabled' : '' ?>">
+                            <a class="page-link" href="?page=<?= $page + 1 ?>&search_name=<?= urlencode($search_name) ?>#search-results">ถัดไป</a>
+                        </li>
+                    </ul>
+                </nav>
+                <div class="text-center text-muted small mt-2">
+                    หน้า <?= $page ?> จาก <?= $total_pages ?> (รวมทั้งหมด <?= number_format($total_rows) ?> รายการ)
+                </div>
+            <?php endif; ?>
 
-    </div>
+        </div>
     </div>
     </div>
     </div>
 
     <?php include 'footer.php'; ?>
-
-    <!-- ⭐ SweetAlert Flash Message -->
-    <?php if (!empty($_SESSION['flash_message'])): ?>
-        <script>
+    <?php include 'includes/alert.php'; ?>
+    <script>
+        function denyAccess(e) {
+            e.preventDefault();
             Swal.fire({
-                icon: "<?= $_SESSION['flash_type'] === 'danger' ? 'error' : $_SESSION['flash_type'] ?>",
-                title: <?= json_encode(
-                            $_SESSION['flash_type'] === 'success' ? '🎉 สำเร็จ'
-                                : ($_SESSION['flash_type'] === 'warning' ? '⚠️ แจ้งเตือน' : '❌ เกิดข้อผิดพลาด')
-                        ) ?>,
-                text: <?= json_encode($_SESSION['flash_message']) ?>,
-                timer: 3000,
-                timerProgressBar: true,
-                showConfirmButton: true,
-                confirmButtonText: "ตกลง",
-                allowOutsideClick: false
+                icon: 'warning',
+                title: 'ไม่มีสิทธิ์เข้าใช้งาน',
+                html: 'ระบบนี้เป็นสิทธิการใช้งานของแอดมินเท่านั้น<br>กรุณาติดต่อแอดมิน',
+                confirmButtonText: 'ตกลง'
             });
-        </script>
-    <?php
-        unset($_SESSION['flash_message'], $_SESSION['flash_type']);
-    endif;
-    ?>
+        }
+    </script>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>

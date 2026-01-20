@@ -22,19 +22,21 @@ try {
     /* =========================
        2) ดึงข้อมูลครู
     ========================= */
-    $sql_teacher = "SELECT 
-                        CONCAT(IFNULL(p.prefix_name,''), t.f_name, ' ', t.l_name) AS teacher_full_name,
-                        s.school_name AS SchoolName,
-                        pos.position_name AS teacher_position,
-                        sub.subject_name,
-                        sg.subjectgroup_name
-                    FROM teacher t
-                    LEFT JOIN prefix p ON t.prefix_id = p.prefix_id
-                    LEFT JOIN school s ON t.school_id = s.school_id
-                    LEFT JOIN position pos ON t.position_id = pos.position_id
-                    LEFT JOIN subject sub ON t.subject_id = sub.subject_id
-                    LEFT JOIN subject_group sg ON sub.subjectgroup_id = sg.subjectgroup_id
-                    WHERE t.t_pid = :pid";
+    $sql_teacher = "
+    SELECT 
+        CONCAT(IFNULL(p.prefix_name,''), t.f_name, ' ', t.l_name) AS teacher_full_name,
+        s.school_name AS SchoolName,
+        pos.position_name AS teacher_position,
+        sg.subjectgroup_name
+    FROM teacher t
+    LEFT JOIN prefix p ON t.prefix_id = p.prefix_id
+    LEFT JOIN school s ON t.school_id = s.school_id
+    LEFT JOIN position pos ON t.position_id = pos.position_id
+    LEFT JOIN subject_group sg 
+           ON t.subjectgroup_id = sg.subjectgroup_id
+    WHERE t.t_pid = :pid
+";
+
 
     $stmt_teacher = $conn->prepare($sql_teacher);
     $stmt_teacher->execute([':pid' => $teacher_pid]);
@@ -44,10 +46,8 @@ try {
         die('<div class="alert alert-danger mt-5 text-center">ไม่พบข้อมูลครูในระบบ</div>');
     }
 
-    $teacher_info['learning_group'] =
-        $teacher_info['subjectgroup_name']
-        ?? $teacher_info['subject_name']
-        ?? '-';
+    $learning_group = $teacher_info['subjectgroup_name'] ?? '-';
+
 
     /* =========================
        3) ดึงประวัติการนิเทศ
@@ -92,6 +92,7 @@ try {
             LEFT JOIN supervisor s ON ss.supervisor_p_id = s.p_id
             LEFT JOIN prefix p ON s.prefix_id = p.prefix_id
             WHERE ss.teacher_t_pid = :pid1
+                AND ss.deleted_at IS NULL
 
             UNION ALL
 
@@ -185,7 +186,7 @@ try {
                         </div>
                         <div class="col-md-6 mb-2">
                             <strong>กลุ่มสาระฯ:</strong>
-                            <?php echo htmlspecialchars($teacher_info['learning_group']); ?>
+                            <?php echo htmlspecialchars($teacher_info['subjectgroup_name'] ?? '-'); ?>
                         </div>
                     </div>
                 </div>
@@ -246,28 +247,6 @@ try {
                                                     </button>
                                                 </form>
 
-                                                <!-- <?php
-                                                        echo '<pre>';
-                                                        echo 'SESSION user_id = ' . ($_SESSION['user_id'] ?? 'none') . "\n";
-                                                        echo 'ROW supervisor_p_id = ' . $row['supervisor_p_id'];
-                                                        echo '</pre>';
-                                                        ?> -->
-
-                                                <?php if (
-                                                    isset($_SESSION['is_logged_in'], $_SESSION['user_id']) &&
-                                                    $_SESSION['is_logged_in'] === true &&
-                                                    $_SESSION['user_id'] == $row['supervisor_p_id']
-                                                ): ?>
-                                                    <a href="classroom/kpi_edit.php
-                                                        ?t_pid=<?= urlencode($row['teacher_t_pid']) ?>
-                                                        &subject_code=<?= urlencode($row['subject_code']) ?>
-                                                        &inspection_time=<?= urlencode($row['inspection_time']) ?>"
-                                                        class="btn btn-warning btn-sm">
-                                                        <i class="fas fa-edit"></i> แก้ไข KPI
-                                                    </a>
-                                                <?php endif; ?>
-
-
                                                 <?php if (!$is_supervisor): ?>
                                                     <?php if ($row['status'] == 0): ?>
                                                         <form method="POST" action="forms/satisfaction_form.php" style="display:inline;">
@@ -312,13 +291,14 @@ try {
                                                         <!-- ยังไม่ประเมิน -->
                                                         <form method="POST" action="forms/satisfaction_form.php" style="display:inline;">
                                                             <input type="hidden" name="mode" value="quickwin">
-                                                            <input type="hidden" name="t_id" value="<?php echo $row['qw_t_id']; ?>">
+                                                            <input type="hidden" name="t_pid" value="<?php echo $row['qw_t_id']; ?>">
                                                             <input type="hidden" name="p_id" value="<?php echo $row['qw_p_id']; ?>">
                                                             <input type="hidden" name="date" value="<?php echo $row['qw_date']; ?>">
                                                             <button type="submit" class="btn btn-sm btn-warning">
                                                                 <i class="fas fa-star"></i> ประเมินจุดเน้น
                                                             </button>
                                                         </form>
+
 
                                                     <?php else: ?>
                                                         <!-- ประเมินแล้ว -->
@@ -353,6 +333,41 @@ try {
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <?php if (isset($_GET['success']) && $_GET['success'] == 1): ?>
+
+        <script>
+            let mode = "<?= $_GET['mode'] ?? '' ?>";
+
+            let title = 'บันทึกสำเร็จ';
+            let text = 'ขอบคุณสำหรับการทำแบบประเมิน';
+
+            if (mode === 'normal') {
+                text = 'บันทึกผลการประเมินชั้นเรียนเรียบร้อยแล้ว';
+            }
+
+            if (mode === 'quickwin') {
+                text = 'บันทึกผลการประเมิน Quick Win เรียบร้อยแล้ว';
+            }
+
+            Swal.fire({
+                icon: 'success',
+                title: title,
+                text: text,
+                confirmButtonText: 'ตกลง',
+                timer: 2500,
+                timerProgressBar: true
+            }).then(() => {
+                // ลบ success & mode ออกจาก URL (กันเด้งซ้ำ)
+                const url = new URL(window.location);
+                url.searchParams.delete('success');
+                url.searchParams.delete('mode');
+                window.history.replaceState({}, document.title, url);
+            });
+        </script>
+
+    <?php endif; ?>
 </body>
 
 </html>

@@ -5,44 +5,113 @@ if (session_status() === PHP_SESSION_NONE) {
 
 require_once '../config/db_connect.php';
 
-// รับค่าจาก URL
-$supervisor_id = $_SESSION['user_id'] ?? '';
-$t_pid         = $_GET['t_pid'] ?? '';
-$subject_code  = $_GET['subject_code'] ?? '';
+/* ===============================
+   รับค่าจาก URL
+================================ */
+$supervisor_id   = $_SESSION['user_id'] ?? '';
+$t_pid           = $_GET['t_pid'] ?? '';
+$subject_code    = $_GET['subject_code'] ?? '';
 $inspection_time = $_GET['inspection_time'] ?? '';
+$isAdmin         = ($_SESSION['role'] ?? '') === 'admin';
 
 if (!$t_pid || !$subject_code || !$inspection_time) {
     die('<div class="alert alert-danger text-center">ข้อมูลไม่ครบถ้วน</div>');
 }
 
-// ดึงข้อมูล session + ชื่อครู + วันที่นิเทศ
-$stmt_session = $conn->prepare("
-    SELECT ss.*, 
-           t.f_name, t.m_name, t.l_name,
-           p.prefix_name,
-           CONCAT(p.prefix_name,' ',t.f_name,' ',t.l_name) AS teacher_name
-    FROM supervision_sessions ss
-    LEFT JOIN teacher t ON ss.teacher_t_pid = t.t_pid
-    LEFT JOIN prefix p ON t.prefix_id = p.prefix_id
-    WHERE ss.supervisor_p_id = ? 
-      AND ss.teacher_t_pid = ? 
-      AND ss.subject_code = ? 
-      AND ss.inspection_time = ?
-");
-$stmt_session->execute([$supervisor_id, $t_pid, $subject_code, $inspection_time]);
+/* ===============================
+   ดึงข้อมูล session + ครู + ศน.
+================================ */
+$sqlSession = "
+SELECT ss.*,
+       CONCAT(pt.prefix_name,' ',t.f_name,' ',t.l_name) AS teacher_name,
+       CONCAT(ps.prefix_name,' ',sp.fname,' ',sp.lname) AS supervisor_name
+FROM supervision_sessions ss
+LEFT JOIN teacher t ON ss.teacher_t_pid = t.t_pid
+LEFT JOIN prefix pt ON t.prefix_id = pt.prefix_id
+LEFT JOIN supervisor sp ON ss.supervisor_p_id = sp.p_id
+LEFT JOIN prefix ps ON sp.prefix_id = ps.prefix_id
+WHERE ss.teacher_t_pid = ?
+  AND ss.subject_code = ?
+  AND ss.inspection_time = ?
+  AND ss.deleted_at IS NULL
+";
+
+$params = [$t_pid, $subject_code, $inspection_time];
+
+if (!$isAdmin) {
+    $sqlSession .= " AND ss.supervisor_p_id = ? ";
+    $params[] = $supervisor_id;
+}
+
+$stmt_session = $conn->prepare($sqlSession);
+$stmt_session->execute($params);
 $session_data = $stmt_session->fetch(PDO::FETCH_ASSOC);
 
 if (!$session_data) {
     die('<div class="alert alert-warning text-center">ไม่พบข้อมูลการนิเทศ</div>');
 }
 
-// ดึงคะแนนเดิม
-$rating_stmt = $conn->prepare("SELECT question_id, rating_score FROM kpi_answers WHERE supervisor_p_id = ? AND teacher_t_pid = ? AND subject_code = ? AND inspection_time = ?");
-$rating_stmt->execute([$supervisor_id, $t_pid, $subject_code, $inspection_time]);
-$ratings = $rating_stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+/* ===============================
+   รายชื่อครู / ศน. (admin)
+================================ */
+$teachers = [];
+$supervisors = [];
 
-// ดึง KPI + คำถาม
-$sql_kpi = "SELECT ind.id AS indicator_id, ind.title AS indicator_title, q.id AS question_id, q.question_text FROM kpi_indicators ind LEFT JOIN kpi_questions q ON ind.id = q.indicator_id ORDER BY ind.display_order, q.display_order";
+if ($isAdmin) {
+    $teachers = $conn->query("
+        SELECT t.t_pid,
+               CONCAT(p.prefix_name,' ',t.f_name,' ',t.l_name) AS teacher_name
+        FROM teacher t
+        LEFT JOIN prefix p ON t.prefix_id = p.prefix_id
+        ORDER BY t.f_name
+    ")->fetchAll(PDO::FETCH_ASSOC);
+
+    $supervisors = $conn->query("
+        SELECT sp.p_id,
+               CONCAT(p.prefix_name,' ',sp.fname,' ',sp.lname) AS supervisor_name
+        FROM supervisor sp
+        LEFT JOIN prefix p ON sp.prefix_id = p.prefix_id
+        ORDER BY sp.fname
+    ")->fetchAll(PDO::FETCH_ASSOC);
+}
+
+/* ===============================
+   ดึงคะแนนเดิม (แก้ bug)
+================================ */
+$sqlRating = "
+SELECT question_id, rating_score
+FROM kpi_answers
+WHERE teacher_t_pid = ?
+  AND subject_code = ?
+  AND inspection_time = ?
+";
+$params = [$t_pid, $subject_code, $inspection_time];
+
+if (!$isAdmin) {
+    $sqlRating .= " AND supervisor_p_id = ? ";
+    $params[] = $supervisor_id;
+}
+
+$stmt = $conn->prepare($sqlRating);
+$stmt->execute($params);
+
+$ratings = [];
+foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+    $ratings[$r['question_id']] = $r['rating_score'];
+}
+
+/* ===============================
+   KPI + คำถาม
+================================ */
+$sql_kpi = "
+SELECT ind.id AS indicator_id,
+       ind.title AS indicator_title,
+       q.id AS question_id,
+       q.question_text
+FROM kpi_indicators ind
+LEFT JOIN kpi_questions q ON ind.id = q.indicator_id
+ORDER BY ind.display_order, q.display_order
+";
 $kpi_res = $conn->query($sql_kpi)->fetchAll(PDO::FETCH_ASSOC);
 
 $indicators = [];
@@ -56,27 +125,62 @@ foreach ($kpi_res as $row) {
     }
 }
 
-// ดึงข้อเสนอแนะรายตัวบ่งชี้
-$notes_stmt = $conn->prepare("SELECT indicator_id, suggestion_text FROM kpi_indicator_suggestions WHERE supervisor_p_id = ? AND teacher_t_pid = ? AND subject_code = ? AND inspection_time = ?");
-$notes_stmt->execute([$supervisor_id, $t_pid, $subject_code, $inspection_time]);
-$indicator_suggestions = $notes_stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+/* ===============================
+   ข้อเสนอแนะรายตัวบ่งชี้
+================================ */
+$sqlNote = "
+SELECT indicator_id, suggestion_text
+FROM kpi_indicator_suggestions
+WHERE teacher_t_pid = ?
+  AND subject_code = ?
+  AND inspection_time = ?
+";
+$params = [$t_pid, $subject_code, $inspection_time];
 
-// ดึงรูปภาพเดิม
-$stmtImg = $conn->prepare("SELECT file_name FROM images WHERE supervisor_p_id = ? AND teacher_t_pid = ? AND subject_code = ? AND inspection_time = ?");
-$stmtImg->execute([$supervisor_id, $t_pid, $subject_code, $inspection_time]);
-$existing_images_db = $stmtImg->fetchAll(PDO::FETCH_ASSOC);
+if (!$isAdmin) {
+    $sqlNote .= " AND supervisor_p_id = ? ";
+    $params[] = $supervisor_id;
+}
+
+$stmt = $conn->prepare($sqlNote);
+$stmt->execute($params);
+$indicator_suggestions = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+
+/* ===============================
+   รูปภาพเดิม
+================================ */
+$sqlImg = "
+SELECT file_name
+FROM images
+WHERE teacher_t_pid = ?
+  AND subject_code = ?
+  AND inspection_time = ?
+";
+$params = [$t_pid, $subject_code, $inspection_time];
+
+if (!$isAdmin) {
+    $sqlImg .= " AND supervisor_p_id = ? ";
+    $params[] = $supervisor_id;
+}
+
+$stmt = $conn->prepare($sqlImg);
+$stmt->execute($params);
+$existing_images_db = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
 <!DOCTYPE html>
 <html lang="th">
 
 <head>
-    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>แก้ไขข้อมูลการนิเทศ</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../css/kpi_style.css">
     <link rel="stylesheet" href="../css/styles.css">
+
     <style>
+        /* ===== CSS เดิมของคุณ (คงไว้ทั้งหมด) ===== */
         .img-item {
             width: 180px;
             height: 135px;
@@ -117,57 +221,147 @@ $existing_images_db = $stmtImg->fetchAll(PDO::FETCH_ASSOC);
             padding: 2px 6px;
             border-radius: 4px;
         }
+
+        .modern-input {
+            border-radius: 14px;
+            padding: 10px 14px;
+            font-size: 0.95rem;
+            border: 1px solid #dee2e6;
+            transition: all .2s ease;
+        }
+
+        .modern-input:focus {
+            border-color: #0d6efd;
+            box-shadow: 0 0 0 .2rem rgba(13, 110, 253, .15);
+        }
+
+        /* ===== Select2 Modern ===== */
+        .select2-container--default .select2-selection--single {
+            height: 46px;
+            border-radius: 14px;
+            border: 1px solid #dee2e6;
+            padding: 8px 12px;
+        }
+
+        .select2-selection__rendered {
+            line-height: 28px !important;
+            font-size: 0.95rem;
+        }
+
+        .select2-selection__arrow {
+            height: 44px !important;
+        }
+
+        .select2-container--default.select2-container--focus .select2-selection--single {
+            border-color: #0d6efd;
+            box-shadow: 0 0 0 .2rem rgba(13, 110, 253, .15);
+        }
     </style>
 </head>
 
 <body class="bg-light">
     <div class="container py-5">
-        <div class="card shadow-sm border-0 mb-4 rounded-4">
-            <div class="card-body p-4 bg-white">
-                <h2 class="text-primary fw-bold mb-3">แก้ไขข้อมูลการนิเทศ</h2>
-                <div class="row g-3">
-                    <div class="col-md-6">
-                        <p class="mb-0">
-                            ผู้นิเทศ: <strong><?= htmlspecialchars($_SESSION['user_name']) ?></strong>
-                            <span class="mx-3">|</span>
-                            ผู้รับนิเทศ: <strong><?= htmlspecialchars($session_data['teacher_name']) ?></strong>
-                        </p>
-                    </div>
-                </div>
-            </div>
-        </div>
 
-        <form id="evaluationForm" method="POST" action="update_kpi_data.php" enctype="multipart/form-data" onsubmit="return validateKpiForm()">
-            <input type="hidden" name="old_t_pid" value="<?= $t_pid ?>">
-            <input type="hidden" name="old_subject_code" value="<?= $subject_code ?>">
-            <input type="hidden" name="old_inspection_time" value="<?= $inspection_time ?>">
+        <form id="evaluationForm" method="POST" action="update_kpi_data.php" enctype="multipart/form-data">
 
+            <input type="hidden" name="redirect_back"
+                value="<?= htmlspecialchars($_SERVER['HTTP_REFERER'] ?? '../index.php') ?>">
+            <input type="hidden" id="formSnapshot" value="">
+            <input type="hidden" name="old_t_pid" value="<?= $session_data['teacher_t_pid'] ?>">
+            <input type="hidden" name="old_subject_code" value="<?= $session_data['subject_code'] ?>">
+            <input type="hidden" name="old_inspection_time" value="<?= $session_data['inspection_time'] ?>">
+            <input type="hidden" name="old_supervisor_p_id" value="<?= $session_data['supervisor_p_id'] ?>">
+
+            <!-- ===== ส่วนครู / ศน. ===== -->
             <div class="card shadow-sm border-0 mb-4 rounded-4">
-                <div class="card-body">
-                    <div class="row g-3">
+                <div class="card-body p-4 bg-white">
+                    <h2 class="text-primary fw-bold mb-4">แก้ไขข้อมูลการนิเทศ</h2>
+
+                    <div class="row g-4">
+
+                        <!-- ผู้นิเทศ -->
+                        <div class="col-md-6">
+                            <label class="fw-bold">ผู้นิเทศ</label>
+                            <?php if ($isAdmin): ?>
+                                <select name="supervisor_p_id" class="form-select modern-input">
+                                    <?php foreach ($supervisors as $s): ?>
+                                        <option value="<?= $s['p_id'] ?>"
+                                            <?= $s['p_id'] == $session_data['supervisor_p_id'] ? 'selected' : '' ?>>
+                                            <?= htmlspecialchars($s['supervisor_name']) ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            <?php else: ?>
+                                <div class="form-control modern-input bg-light">
+                                    <?= htmlspecialchars($session_data['supervisor_name']) ?>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+
+                        <!-- ผู้รับนิเทศ -->
+                        <div class="col-md-6">
+                            <label class="fw-bold">ผู้รับนิเทศ</label>
+                            <?php if ($isAdmin): ?>
+                                <select name="teacher_t_pid"
+                                    class="form-select js-teacher-search modern-input"
+                                    data-placeholder="พิมพ์ชื่อครูเพื่อค้นหา...">
+                                    <option></option>
+                                    <?php foreach ($teachers as $t): ?>
+                                        <option value="<?= $t['t_pid'] ?>"
+                                            <?= $t['t_pid'] == $session_data['teacher_t_pid'] ? 'selected' : '' ?>>
+                                            <?= htmlspecialchars($t['teacher_name']) ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            <?php else: ?>
+                                <div class="form-control modern-input bg-light">
+                                    <?= htmlspecialchars($session_data['teacher_name']) ?>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+
+                        <!-- รหัสวิชา -->
                         <div class="col-md-3">
                             <label class="fw-bold">รหัสวิชา</label>
-                            <input type="text" name="subject_code" class="form-control" value="<?= htmlspecialchars($session_data['subject_code']) ?>" required>
+                            <input type="text" name="subject_code"
+                                class="form-control modern-input"
+                                value="<?= htmlspecialchars($session_data['subject_code']) ?>" required>
                         </div>
-                        <div class="col-md-3">
+
+                        <!-- ชื่อวิชา -->
+                        <div class="col-md-5">
                             <label class="fw-bold">ชื่อวิชา</label>
-                            <input type="text" name="subject_name" class="form-control" value="<?= htmlspecialchars($session_data['subject_name']) ?>" required>
+                            <input type="text" name="subject_name"
+                                class="form-control modern-input"
+                                value="<?= htmlspecialchars($session_data['subject_name']) ?>" required>
                         </div>
-                        <div class="col-md-3">
+
+                        <!-- ครั้งที่นิเทศ -->
+                        <div class="col-md-2">
                             <label class="fw-bold">ครั้งที่นิเทศ</label>
-                            <select name="inspection_time" class="form-select">
+                            <select name="inspection_time" class="form-select modern-input">
                                 <?php for ($i = 1; $i <= 10; $i++): ?>
-                                    <option value="<?= $i ?>" <?= ($session_data['inspection_time'] == $i) ? 'selected' : '' ?>>ครั้งที่ <?= $i ?></option>
+                                    <option value="<?= $i ?>"
+                                        <?= ($session_data['inspection_time'] == $i) ? 'selected' : '' ?>>
+                                        ครั้งที่ <?= $i ?>
+                                    </option>
                                 <?php endfor; ?>
                             </select>
                         </div>
-                        <div class="col-md-3">
+
+                        <!-- วันที่นิเทศ -->
+                        <div class="col-md-2">
                             <label class="fw-bold">วันที่นิเทศ</label>
-                            <input type="text" class="form-control bg-light" value="<?= date('d/m/Y', strtotime($session_data['supervision_date'])) ?>" readonly>
+                            <input type="text"
+                                class="form-control modern-input bg-light"
+                                value="<?= date('d/m/Y', strtotime($session_data['supervision_date'])) ?>"
+                                readonly>
                         </div>
+
                     </div>
                 </div>
             </div>
+
 
             <?php foreach ($indicators as $iid => $data): ?>
                 <div class="indicator-section">
@@ -202,7 +396,7 @@ $existing_images_db = $stmtImg->fetchAll(PDO::FETCH_ASSOC);
             <div class="card shadow-sm border-0 mb-4 rounded-4">
                 <div class="card-header bg-white fw-bold py-3">📝 ข้อเสนอแนะเพิ่มเติม</div>
                 <div class="card-body">
-                    <textarea class="form-control" name="overall_suggestion" rows="3"><?= htmlspecialchars($session_data['overall_suggestion']) ?></textarea>
+                    <textarea class="form-control" name="overall_suggestion" rows="3" placeholder="ระบุข้อเสนอแนะเพิ่มเติมที่นี่..."><?= htmlspecialchars($session_data['overall_suggestion']) ?></textarea>
                 </div>
             </div>
 
@@ -226,129 +420,172 @@ $existing_images_db = $stmtImg->fetchAll(PDO::FETCH_ASSOC);
             <div class="text-center mb-5 d-flex justify-content-center gap-3 flex-wrap">
 
                 <!-- บันทึก -->
-                <button type="button"
-                    class="btn btn-modern btn-save shadow"
-                    onclick="confirmSave()">
-                    <i class="fas fa-save"></i> บันทึกการแก้ไข
-                </button>
+                <?php if ($isAdmin): ?>
+                    <button type="button"
+                        class="btn btn-modern btn-save shadow"
+                        onclick="confirmSave()">
+                        <i class="fas fa-save"></i> บันทึกการแก้ไข
+                    </button>
+                <?php endif; ?>
 
                 <!-- ยกเลิก -->
                 <button type="button"
                     class="btn btn-modern btn-cancel shadow"
-                    onclick="window.location.href='../index.php'">
-                    <i class="fas fa-arrow-left"></i> กลับหน้าหลัก
-                </button>
-
-                <!-- ลบ -->
-                <button type="button"
-                    class="btn btn-modern btn-delete shadow"
-                    onclick="confirmDelete()">
-                    <i class="fas fa-trash"></i> ลบแบบบันทึก
+                    onclick="window.location.href='<?= htmlspecialchars($_SERVER['HTTP_REFERER'] ?? '../index.php') ?>'">
+                    <i class="fas fa-arrow-left"></i> กลับหน้าที่แล้ว
                 </button>
 
             </div>
 
-            <form id="deleteForm" action="delete_kpi_session.php" method="POST">
-                <input type="hidden" name="t_pid" value="<?= htmlspecialchars($t_pid) ?>">
-                <input type="hidden" name="subject_code" value="<?= htmlspecialchars($subject_code) ?>">
-                <input type="hidden" name="inspection_time" value="<?= htmlspecialchars($inspection_time) ?>">
-            </form>
+        </form>
+
+        <form id="deleteForm" action="delete_kpi_session.php" method="POST">
+            <input type="hidden" name="t_pid" value="<?= htmlspecialchars($t_pid) ?>">
+            <input type="hidden" name="subject_code" value="<?= htmlspecialchars($subject_code) ?>">
+            <input type="hidden" name="inspection_time" value="<?= htmlspecialchars($inspection_time) ?>">
+        </form>
 
 
-            <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+        <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
-            <script>
-                function showPopup(icon, title, text, timer = 3000) {
-                    Swal.fire({
-                        icon: icon,
-                        title: title,
-                        text: text,
-                        timer: timer,
-                        timerProgressBar: true,
-                        showConfirmButton: false,
-                        toast: true,
-                        position: 'top-end'
-                    });
+        <script>
+            function showPopup(icon, title, text, timer = 3000) {
+                Swal.fire({
+                    icon: icon,
+                    title: title,
+                    text: text,
+                    timer: timer,
+                    timerProgressBar: true,
+                    showConfirmButton: false,
+                    toast: true,
+                    position: 'top-end'
+                });
+            }
+        </script>
+
+        <script>
+            const imageInput = document.getElementById('imageInput');
+            const imageContainer = document.getElementById('imageContainer');
+            const totalQuestions = <?= $total_questions_count ?>;
+
+            imageInput.addEventListener('change', function() {
+                const existingCount = imageContainer.querySelectorAll('.existing-img').length;
+                const files = Array.from(this.files);
+
+                if ((existingCount + files.length) > 2) {
+                    alert('รูปภาพรวมทั้งหมดต้องไม่เกิน 2 รูปครับ (ตอนนี้มีรูปเดิม ' + existingCount + ' รูป)');
+                    this.value = '';
+                    return;
                 }
-            </script>
 
-            <script>
-                const imageInput = document.getElementById('imageInput');
-                const imageContainer = document.getElementById('imageContainer');
-                const totalQuestions = <?= $total_questions_count ?>;
+                // ล้างพรีวิวเก่าของ "รูปใหม่" ออกก่อน เพื่อแสดงรูปที่เพิ่งเลือกเข้าไปล่าสุด
+                imageContainer.querySelectorAll('.new-preview').forEach(p => p.remove());
 
-                imageInput.addEventListener('change', function() {
-                    const existingCount = imageContainer.querySelectorAll('.existing-img').length;
-                    const files = Array.from(this.files);
-
-                    if ((existingCount + files.length) > 2) {
-                        alert('รูปภาพรวมทั้งหมดต้องไม่เกิน 2 รูปครับ (ตอนนี้มีรูปเดิม ' + existingCount + ' รูป)');
-                        this.value = '';
-                        return;
-                    }
-
-                    // ล้างพรีวิวเก่าของ "รูปใหม่" ออกก่อน เพื่อแสดงรูปที่เพิ่งเลือกเข้าไปล่าสุด
-                    imageContainer.querySelectorAll('.new-preview').forEach(p => p.remove());
-
-                    files.forEach(file => {
-                        const reader = new FileReader();
-                        reader.onload = function(e) {
-                            const div = document.createElement('div');
-                            div.classList.add('img-item', 'new-preview');
-                            div.innerHTML = `
+                files.forEach(file => {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const div = document.createElement('div');
+                        div.classList.add('img-item', 'new-preview');
+                        div.innerHTML = `
             <img src="${e.target.result}" class="kpi-image" style="border:2px solid #0d6efd">
             <span class="badge-new">รูปใหม่</span>
             <button type="button" class="btn-remove-custom" onclick="this.parentElement.remove()">×</button>
           `;
-                            imageContainer.appendChild(div);
-                        }
-                        reader.readAsDataURL(file);
-                    });
-                });
-                const totalQuestions = <?= $total_questions_count ?>;
-
-                function confirmSave() {
-                    const checked = document.querySelectorAll('input[type="radio"]:checked');
-
-                    if (checked.length < totalQuestions) {
-                        showPopup(
-                            'warning',
-                            '⚠️ ตอบคำถามไม่ครบ',
-                            `คุณตอบไปแล้ว ${checked.length} / ${totalQuestions} ข้อ`
-                        );
-                        return;
+                        imageContainer.appendChild(div);
                     }
+                    reader.readAsDataURL(file);
+                });
+            });
 
-                    Swal.fire({
-                        icon: 'question',
-                        title: '📌 ยืนยันการแก้ไข',
-                        text: 'ต้องการบันทึกการแก้ไขข้อมูลนี้ใช่หรือไม่?',
-                        showCancelButton: true,
-                        confirmButtonText: '💾 บันทึก',
-                        cancelButtonText: '❌ ยกเลิก'
-                    }).then((result) => {
-                        if (result.isConfirmed) {
-                            document.getElementById('evaluationForm').submit();
-                        }
-                    });
+            function confirmSave() {
+
+                const checked = document.querySelectorAll('input[type="radio"]:checked');
+                if (checked.length < totalQuestions) {
+                    showPopup(
+                        'warning',
+                        '⚠️ ตอบคำถามไม่ครบ',
+                        `คุณตอบไปแล้ว ${checked.length} / ${totalQuestions} ข้อ`
+                    );
+                    return;
                 }
 
-                function confirmDelete() {
+                const currentSnapshot = getFormSnapshot();
+                if (currentSnapshot === initialSnapshot) {
                     Swal.fire({
-                        icon: 'warning',
-                        title: '⚠️ ลบแบบบันทึก',
-                        text: 'การลบจะไม่สามารถกู้คืนได้ ต้องการดำเนินการต่อหรือไม่?',
-                        showCancelButton: true,
-                        confirmButtonText: '🗑️ ลบ',
-                        cancelButtonText: '❌ ยกเลิก'
-                    }).then((result) => {
-                        if (result.isConfirmed) {
-                            document.getElementById('deleteForm').submit();
-                        }
+                        icon: 'info',
+                        title: 'ℹ️ ไม่มีการเปลี่ยนแปลง',
+                        text: 'คุณยังไม่ได้แก้ไขข้อมูลใด ๆ',
                     });
+                    return;
                 }
-            </script>
 
+                Swal.fire({
+                    icon: 'question',
+                    title: '📌 ยืนยันการแก้ไข',
+                    text: 'ต้องการบันทึกการแก้ไขข้อมูลนี้ใช่หรือไม่?',
+                    showCancelButton: true,
+                    confirmButtonText: '💾 บันทึก',
+                    cancelButtonText: '❌ ยกเลิก'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        document.getElementById('evaluationForm').submit();
+                    }
+                });
+            }
+
+            function confirmDelete() {
+                Swal.fire({
+                    icon: 'warning',
+                    title: '⚠️ ลบแบบบันทึก',
+                    text: 'ข้อมูลจะถูกย้ายไปถังขยะ และสามารถกู้คืนได้ภายหลัง',
+                    showCancelButton: true,
+                    confirmButtonText: '🗑️ ลบ',
+                    cancelButtonText: '❌ ยกเลิก'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        document.getElementById('deleteForm').submit();
+                    }
+                });
+            }
+        </script>
+
+        <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                $('.js-teacher-search').select2({
+                    placeholder: 'ค้นหาชื่อครู...',
+                    allowClear: true,
+                    width: '100%',
+                    language: {
+                        noResults: function() {
+                            return "ไม่พบชื่อครู";
+                        }
+                    }
+                });
+            });
+
+            let initialSnapshot = null;
+
+            function getFormSnapshot() {
+                const data = new FormData(document.getElementById('evaluationForm'));
+                const obj = {};
+
+                for (let [key, value] of data.entries()) {
+                    if (key === 'images[]') continue; // ไม่เช็ครูป
+                    obj[key] = value;
+                }
+
+                return JSON.stringify(obj);
+            }
+
+            document.addEventListener('DOMContentLoaded', () => {
+                initialSnapshot = getFormSnapshot();
+                document.getElementById('formSnapshot').value = initialSnapshot;
+            });
+        </script>
 
 </body>
 

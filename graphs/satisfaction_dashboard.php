@@ -225,51 +225,59 @@ $js_background_colors = json_encode($background_colors);
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             border: none;
         }
+
+        .dashboard-header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(4px);
+            border-radius: 18px;
+            padding: 18px 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+            border-left: 6px solid #0d6efd;
+        }
+
+        .dashboard-main {
+            background: rgba(255, 255, 255, 0.96);
+            border-radius: 22px;
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15);
+        }
     </style>
 </head>
 
 <body>
     <div class="container mt-5">
 
-        <div class="row justify-content-center mb-4">
-            <div class="col-md-8">
-                <div class="card p-3 bg-white">
-                    <div class="d-flex align-items-center justify-content-between">
-                        <label class="fw-bold text-primary me-3"><i class="fas fa-filter"></i> เลือกชุดข้อมูล:</label>
-                        <select class="form-select w-75" id="formTypeSelect" onchange="location = this.value;">
-                            <option value="satisfaction_dashboard.php?form_type=1" <?php echo ($form_type == 1) ? 'selected' : ''; ?>>
-                                📊 <?php echo $form_titles[1]; ?>
-                            </option>
-                            <option value="quickwin_dashboard.php?form_type=3" <?php echo ($form_type == 3) ? 'selected' : ''; ?>>
-                                🚀 <?php echo $form_titles[3]; ?>
-                            </option>
-                        </select>
-                    </div>
+        <div class="card dashboard-main shadow-lg mb-4">
+            <div class="card-body">
+
+                <!-- Header + Back -->
+                <div class="d-flex align-items-center mb-3">
+                    <a href="../index.php" class="btn btn-danger me-3">
+                        <i class="fas fa-arrow-left"></i> กลับหน้าหลัก
+                    </a>
+                    <h2 class="mb-0 fw-bold text-center flex-grow-1">
+                        📊 Dashboard สรุปผลการนิเทศ
+                    </h2>
                 </div>
+
+                <hr class="my-4">
+
+                <!-- กราฟแรก -->
+                <?php if ($form_type == 1): ?>
+                    <?php
+                    $dashboard_data = $satisfaction_data;
+                    include 'satisfaction_pie_chart.php';
+                    ?>
+                <?php elseif ($form_type == 3): ?>
+                    <?php
+                    $dashboard_data = $satisfaction_data;
+                    include 'quick_win_chart.php';
+                    ?>
+                <?php endif; ?>
+
             </div>
         </div>
 
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <a href="../index.php" class="btn btn-danger shadow-sm"><i class="fas fa-arrow-left"></i> กลับหน้าหลัก</a>
-            <h2 class="text-center mb-0 flex-grow-1 text-dark fw-bold">Dashboard สรุปผลการนิเทศ</h2>
-            <div style="width: 100px;"></div>
-        </div>
-
-        <?php if ($form_type == 1): ?>
-            <div class="row">
-                <div class="col-lg-12 chart-card">
-                    <?php $dashboard_data = $satisfaction_data;
-                    include 'satisfaction_pie_chart.php'; ?>
-                </div>
-            </div>
-        <?php elseif ($form_type == 3): ?>
-            <div class="row">
-                <div class="col-lg-12 chart-card">
-                    <?php $dashboard_data = $satisfaction_data;
-                    include 'quick_win_chart.php'; ?>
-                </div>
-            </div>
-        <?php endif; ?>
 
         <div class="row">
             <div class="col-lg-12 chart-card">

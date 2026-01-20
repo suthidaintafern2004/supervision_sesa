@@ -56,7 +56,7 @@ try {
     // 2.1 บันทึก Log (ใช้ PDO)
     // หมายเหตุ: ใช้ตารางเดิม แต่ช่อง subject_code จะเป็น NULL หรืออาจใส่ค่าพิเศษถ้าต้องการ
     $sql_log = "INSERT IGNORE INTO certificate_log 
-                (supervisor_p_id, teacher_t_pid, inspection_time, generated_at) 
+                (supervisor_p_id, teacher_t_pid, inspection_time, generated_at, academic_year) 
                 VALUES (:sid, :tid, :date_val, NOW())";
     $stmt_log = $conn->prepare($sql_log);
     // ในที่นี้ inspection_time ถูกประยุกต์ใช้เก็บ 'วันที่' แทน string
@@ -85,7 +85,7 @@ try {
             LEFT JOIN teacher t ON qw.t_pid = t.t_pid -- แก้ t_id เป็น t_pid
             LEFT JOIN prefix p ON t.prefix_id = p.prefix_id
             LEFT JOIN school sc ON t.school_id = sc.school_id
-            WHERE qw.p_id = :pid 
+            WHERE qw.p_id = :pid
               AND qw.t_pid = :tid -- แก้ t_id เป็น t_pid
               AND qw.supervision_date = :sdate";
 
@@ -104,6 +104,7 @@ try {
 $teacher_name = $session['teacher_full_name'];
 $school_name  = $session['SchoolName'];
 $issue_date_parts = toThaiDate($session['supervision_date']);
+$academic_year = getAcademicYear($session['supervision_date']);
 
 // สร้างตัวแปรสำหรับแสดงผล (ย้ายขึ้นมาข้างบน)
 $ref_prefix = 'ศน.';
@@ -169,7 +170,7 @@ $pdf->Cell(0, 0, $teacher_name, 0, 1, 'C', 0, '', 0);
 // 3. โรงเรียน
 $pdf->SetFont($currentFont, '', 35);
 $pdf->SetY(83);
-$pdf->Cell(0, 0, "ครู โรงเรียน {$school_name}", 0, 1, 'C', 0, '', 0);
+$pdf->Cell(0, 0, "โรงเรียน {$school_name}", 0, 1, 'C', 0, '', 0);
 
 // 4. วันที่
 $pdf->SetFont($currentFont, '', 23);

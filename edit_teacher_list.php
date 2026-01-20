@@ -348,7 +348,7 @@ try {
                 .then(r => r.json())
                 .then(d => {
                     if (!d.success) {
-                        alert("Error โหลดข้อมูล: " + (d.message || 'Unknown error'));
+                        popup('error', 'โหลดข้อมูลไม่สำเร็จ', d.message || 'เกิดข้อผิดพลาด');
                         return;
                     }
                     const t = d.data;
@@ -362,113 +362,164 @@ try {
                     document.getElementById("edit_school_id").value = t.school_id || '';
                     new bootstrap.Modal(document.getElementById('editTeacherModal')).show();
                 })
-                .catch(e => {
-                    console.error(e);
-                    alert("เกิดข้อผิดพลาดในการโหลดข้อมูล");
+                .catch(() => {
+                    popup('error', 'ผิดพลาด', 'ไม่สามารถโหลดข้อมูลครูได้');
                 });
+
         }
 
         function saveTeacherEdit() {
-            const form = document.getElementById("teacherEditForm");
-            if (!form.checkValidity()) {
-                alert("กรุณากรอกข้อมูลให้ครบถ้วน");
+
+            const f = document.getElementById("teacherEditForm");
+
+            if (
+                f.prefix_id.value === '' ||
+                f.f_name.value.trim() === '' ||
+                f.l_name.value.trim() === '' ||
+                f.position_id.value === '' ||
+                f.rank_id.value === '' ||
+                f.subjectgroup_id.value === '' ||
+                f.school_id.value === ''
+            ) {
+                popup('warning', 'ข้อมูลไม่ครบ', 'กรุณาเลือกและกรอกข้อมูลให้ครบถ้วน');
                 return;
             }
 
-            const data = new FormData(form);
-            const btnSave = document.querySelector('#editTeacherModal .btn-warning');
-            const originalText = btnSave.innerHTML;
-            btnSave.disabled = true;
-            btnSave.innerHTML = '<i class="fas fa-spinner fa-spin"></i> กำลังบันทึก...';
+            Swal.fire({
+                title: 'ยืนยันการแก้ไข',
+                text: 'ต้องการบันทึกการแก้ไขข้อมูลครูหรือไม่?',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'บันทึก',
+                cancelButtonText: 'ยกเลิก'
+            }).then(res => {
 
-            fetch("api/update_teacher.php", {
+                if (!res.isConfirmed) return;
+
+                const data = new FormData(f);
+                const btn = document.querySelector('#editTeacherModal .btn-warning');
+                const txt = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> กำลังบันทึก...';
+
+                fetch("api/update_teacher.php", {
+                        method: "POST",
+                        body: data
+                    })
+                    .then(r => r.json())
+                    .then(d => {
+                        if (d.success) {
+                            Swal.fire('สำเร็จ', 'บันทึกข้อมูลแล้ว', 'success');
+                            bootstrap.Modal.getInstance(
+                                document.getElementById('editTeacherModal')
+                            ).hide();
+                            loadData(true);
+                        } else {
+                            popup('error', 'ผิดพลาด', d.message);
+                        }
+                    })
+                    .catch(() => popup('error', 'ผิดพลาด', 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้'))
+                    .finally(() => {
+                        btn.disabled = false;
+                        btn.innerHTML = txt;
+                    });
+            });
+        }
+
+        function deleteTeacher(pid) {
+
+            Swal.fire({
+                title: 'ยืนยันการลบ',
+                html: 'ต้องการลบข้อมูลครูรายนี้หรือไม่?<br><small class="text-danger">ข้อมูลการนิเทศอาจได้รับผลกระทบ</small>',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'ลบ',
+                cancelButtonText: 'ยกเลิก'
+            }).then(res => {
+
+                if (!res.isConfirmed) return;
+
+                const data = new FormData();
+                data.append("t_pid", pid);
+
+                fetch("api/delete_teacher.php", {
+                        method: "POST",
+                        body: data
+                    })
+                    .then(r => r.json())
+                    .then(d => {
+                        if (d.success) {
+                            Swal.fire('ลบสำเร็จ', '', 'success');
+                            loadData(true);
+                        } else {
+                            popup('error', 'ผิดพลาด', d.message);
+                        }
+                    })
+                    .catch(() => popup('error', 'ผิดพลาด', 'ไม่สามารถลบข้อมูลได้'));
+            });
+        }
+
+
+        function saveNewTeacher() {
+
+            const f = document.getElementById("addTeacherForm");
+
+            if (
+                f.t_pid.value.trim() === '' ||
+                f.prefix_id.value === '' ||
+                f.f_name.value.trim() === '' ||
+                f.l_name.value.trim() === '' ||
+                f.position_id.value === '' ||
+                f.rank_id.value === '' ||
+                f.subjectgroup_id.value === '' ||
+                f.school_id.value === ''
+            ) {
+                popup('warning', 'ข้อมูลไม่ครบ', 'กรุณาเลือกและกรอกข้อมูลให้ครบถ้วน');
+                return;
+            }
+
+            const data = new FormData(f);
+            const btn = document.querySelector('#addTeacherModal .btn-success');
+            const txt = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> กำลังบันทึก...';
+
+            fetch("api/add_teacher.php", {
                     method: "POST",
                     body: data
                 })
                 .then(r => r.json())
                 .then(d => {
                     if (d.success) {
-                        alert("บันทึกข้อมูลสำเร็จ");
-                        var myModalEl = document.getElementById('editTeacherModal');
-                        var modal = bootstrap.Modal.getInstance(myModalEl);
-                        modal.hide();
+                        Swal.fire('สำเร็จ', 'เพิ่มข้อมูลครูแล้ว', 'success');
+                        f.reset();
+                        bootstrap.Modal.getInstance(
+                            document.getElementById('addTeacherModal')
+                        ).hide();
                         loadData(true);
                     } else {
-                        alert("เกิดข้อผิดพลาด: " + d.message);
+                        popup('error', 'ผิดพลาด', d.message);
                     }
                 })
-                .catch(err => {
-                    console.error(err);
-                    alert("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์");
-                })
+                .catch(() => popup('error', 'ผิดพลาด', 'บันทึกข้อมูลไม่สำเร็จ'))
                 .finally(() => {
-                    btnSave.disabled = false;
-                    btnSave.innerHTML = originalText;
+                    btn.disabled = false;
+                    btn.innerHTML = txt;
                 });
         }
 
-        function deleteTeacher(pid) {
-            if (!confirm("ยืนยันการลบข้อมูลครูท่านนี้? \n(ข้อมูลการนิเทศที่เกี่ยวข้องอาจได้รับผลกระทบ)")) return;
 
-            const data = new FormData();
-            data.append("t_pid", pid);
-
-            fetch("api/delete_teacher.php", {
-                    method: "POST",
-                    body: data
-                })
-                .then(r => r.json()).then(d => {
-                    if (d.success) {
-                        alert("ลบข้อมูลสำเร็จ");
-                        loadData(true);
-                    } else {
-                        alert("Error: " + d.message);
-                    }
-                })
-                .catch(e => {
-                    alert("เกิดข้อผิดพลาดในการเชื่อมต่อ");
-                });
-        }
-
-        function saveNewTeacher() {
-            const form = document.getElementById("addTeacherForm");
-            if (!form.checkValidity()) {
-                form.reportValidity();
-                return;
-            }
-
-            const data = new FormData(form);
-            const btnSave = document.querySelector('#addTeacherModal .btn-success');
-            const originalText = btnSave.innerHTML;
-            btnSave.disabled = true;
-            btnSave.innerHTML = '<i class="fas fa-spinner fa-spin"></i> กำลังบันทึก...';
-
-            fetch("api/add_teacher.php", {
-                    method: "POST",
-                    body: data
-                })
-                .then(r => r.json()).then(d => {
-                    if (d.success) {
-                        alert("เพิ่มข้อมูลสำเร็จ");
-                        form.reset();
-                        var myModalEl = document.getElementById('addTeacherModal');
-                        var modal = bootstrap.Modal.getInstance(myModalEl);
-                        modal.hide();
-                        loadData(true);
-                    } else {
-                        alert("Error: " + d.message);
-                    }
-                })
-                .catch(err => {
-                    console.error(err);
-                    alert("เกิดข้อผิดพลาดในการบันทึก");
-                })
-                .finally(() => {
-                    btnSave.disabled = false;
-                    btnSave.innerHTML = originalText;
-                });
+        function popup(type, title, text) {
+            Swal.fire({
+                icon: type,
+                title: title,
+                text: text,
+                confirmButtonText: 'ตกลง'
+            });
         }
     </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 </body>
 

@@ -9,135 +9,97 @@ require_once '../config/db_connect.php';
    ตรวจสอบสิทธิ์
 ========================= */
 if (empty($_SESSION['user_id'])) {
-    die('Unauthorized');
+    http_response_code(401);
+    exit('Unauthorized');
 }
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    die('Invalid request');
+    http_response_code(405);
+    exit('Invalid request');
 }
 
+$isAdmin = ($_SESSION['role'] ?? '') === 'admin';
+
 /* =========================
-   รับค่าจากฟอร์ม (ต้องตรงกับ kpi_edit.php)
+   รับค่าจากฟอร์ม
 ========================= */
-$supervisor_id   = $_SESSION['user_id'];
 $teacher_t_pid   = $_POST['t_pid'] ?? '';
 $subject_code    = $_POST['subject_code'] ?? '';
 $inspection_time = $_POST['inspection_time'] ?? '';
 
-if (!$teacher_t_pid || !$subject_code || !$inspection_time) {
-    die('ข้อมูลไม่ครบ');
+/* ⭐ admin ต้องส่ง supervisor_p_id มาด้วย */
+$supervisor_id = $isAdmin
+    ? ($_POST['supervisor_p_id'] ?? null)
+    : $_SESSION['user_id'];
+
+if (!$teacher_t_pid || !$subject_code || !$inspection_time || !$supervisor_id) {
+    $error = 'ข้อมูลไม่ครบ';
 }
 
-$uploadDir = "../uploads/";
+/* =========================
+   ลบ (Soft delete)
+========================= */
+if (empty($error)) {
+    try {
+        $stmt = $conn->prepare("
+            UPDATE supervision_sessions
+            SET deleted_at = NOW()
+            WHERE supervisor_p_id = ?
+              AND teacher_t_pid   = ?
+              AND subject_code    = ?
+              AND inspection_time = ?
+              AND deleted_at IS NULL
+            LIMIT 1
+        ");
 
-try {
-    $conn->beginTransaction();
+        $stmt->execute([
+            $supervisor_id,
+            $teacher_t_pid,
+            $subject_code,
+            $inspection_time
+        ]);
 
-    /* =========================
-       1) ลบรูปภาพ (ไฟล์ + DB)
-    ========================= */
-    $imgStmt = $conn->prepare("
-        SELECT file_name
-        FROM images
-        WHERE supervisor_p_id = ?
-          AND teacher_t_pid = ?
-          AND subject_code = ?
-          AND inspection_time = ?
-    ");
-    $imgStmt->execute([
-        $supervisor_id,
-        $teacher_t_pid,
-        $subject_code,
-        $inspection_time
-    ]);
-
-    $images = $imgStmt->fetchAll(PDO::FETCH_COLUMN);
-
-    foreach ($images as $img) {
-        $filePath = $uploadDir . $img;
-        if (is_file($filePath)) {
-            @unlink($filePath);
+        if ($stmt->rowCount() === 0) {
+            throw new Exception('ไม่พบข้อมูล หรือไม่มีสิทธิ์ลบ');
         }
+    } catch (Exception $e) {
+        $error = $e->getMessage();
     }
-
-    $conn->prepare("
-        DELETE FROM images
-        WHERE supervisor_p_id = ?
-          AND teacher_t_pid = ?
-          AND subject_code = ?
-          AND inspection_time = ?
-    ")->execute([
-        $supervisor_id,
-        $teacher_t_pid,
-        $subject_code,
-        $inspection_time
-    ]);
-
-    /* =========================
-       2) ลบคำตอบ KPI
-    ========================= */
-    $conn->prepare("
-        DELETE FROM kpi_answers
-        WHERE supervisor_p_id = ?
-          AND teacher_t_pid = ?
-          AND subject_code = ?
-          AND inspection_time = ?
-    ")->execute([
-        $supervisor_id,
-        $teacher_t_pid,
-        $subject_code,
-        $inspection_time
-    ]);
-
-    /* =========================
-       3) ลบข้อค้นพบรายตัวชี้วัด
-    ========================= */
-    $conn->prepare("
-        DELETE FROM kpi_indicator_suggestions
-        WHERE supervisor_p_id = ?
-          AND teacher_t_pid = ?
-          AND subject_code = ?
-          AND inspection_time = ?
-    ")->execute([
-        $supervisor_id,
-        $teacher_t_pid,
-        $subject_code,
-        $inspection_time
-    ]);
-
-    /* =========================
-       4) ลบ session หลัก (ตัวตัดสิน)
-    ========================= */
-    $stmt = $conn->prepare("
-        DELETE FROM supervision_sessions
-        WHERE supervisor_p_id = ?
-          AND teacher_t_pid = ?
-          AND subject_code = ?
-          AND inspection_time = ?
-    ");
-    $stmt->execute([
-        $supervisor_id,
-        $teacher_t_pid,
-        $subject_code,
-        $inspection_time
-    ]);
-
-    // ถ้าไม่ลบได้จริง → rollback
-    if ($stmt->rowCount() === 0) {
-        $conn->rollBack();
-        die('❌ ไม่พบข้อมูลการนิเทศที่ต้องการลบ');
-    }
-
-    $conn->commit();
-
-    echo "<script>
-        alert('🗑️ ลบข้อมูลการนิเทศเรียบร้อยแล้ว');
-        window.location.href = '../index.php';
-    </script>";
-
-} catch (Exception $e) {
-    if ($conn->inTransaction()) {
-        $conn->rollBack();
-    }
-    echo 'เกิดข้อผิดพลาด: ' . $e->getMessage();
 }
+?>
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <title>ลบข้อมูล</title>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+
+<body>
+
+    <script>
+        <?php if (empty($error)): ?>
+            Swal.fire({
+                icon: 'success',
+                title: 'สำเร็จ',
+                text: 'ย้ายข้อมูลไปยังถังขยะแล้ว',
+                confirmButtonText: 'ตกลง'
+            }).then(() => {
+                window.location.href = '../my_sessions_list.php';
+            });
+        <?php else: ?>
+            Swal.fire({
+                icon: 'error',
+                title: 'เกิดข้อผิดพลาด',
+                text: <?= json_encode($error) ?>,
+                confirmButtonText: 'ตกลง'
+            }).then(() => {
+                window.history.back();
+            });
+        <?php endif; ?>
+    </script>
+
+</body>
+
+</html>

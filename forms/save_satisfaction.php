@@ -1,220 +1,215 @@
 <?php
-// forms/save_satisfaction.php
+
+/*************************************************
+ * save_satisfaction.php
+ * FINAL – Normal + Quickwin (Safe / Production)
+ *************************************************/
+
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// เชื่อมต่อฐานข้อมูล (PDO)
-if (file_exists('../config/db_connect.php')) {
-    require_once '../config/db_connect.php';
-} elseif (file_exists('config/db_connect.php')) {
-    require_once 'config/db_connect.php';
+require_once '../config/db_connect.php';
+
+/* ===============================
+   ตรวจ method
+=============================== */
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    exit('Invalid request method');
 }
 
-function redirect_with_flash_message($message, $type = 'danger', $location = '../history.php')
-{
-    $_SESSION['flash_message']      = $message;
-    $_SESSION['flash_message_type'] = $type;
-    echo "<script>window.location.href='$location';</script>";
-    exit();
+/* ===============================
+   รับค่าพื้นฐาน
+=============================== */
+$mode       = $_POST['mode'] ?? null;
+$ratings    = $_POST['ratings'] ?? [];
+$suggestion = trim($_POST['overall_suggestion'] ?? '');
+
+if (!in_array($mode, ['normal', 'quickwin'], true)) {
+    exit('โหมดไม่ถูกต้อง');
 }
-
-if ($_SERVER["REQUEST_METHOD"] !== "POST") {
-    redirect_with_flash_message("Invalid request method.");
-}
-
-// โหมดการประเมิน
-$mode = $_POST['mode'] ?? 'normal';
-
-// ข้อมูลร่วม
-$ratings            = $_POST['ratings'] ?? [];
-$overall_suggestion = trim($_POST['overall_suggestion'] ?? '');
 
 if (empty($ratings)) {
-    redirect_with_flash_message("กรุณาให้คะแนนประเมินอย่างน้อย 1 ข้อ");
+    exit('กรุณาประเมินให้ครบทุกข้อ');
 }
 
-try {
-    $conn->beginTransaction();
+$conn->beginTransaction();
 
-    // ---------------------------------------------------------
-    // [NORMAL] นิเทศปกติ
-    // ---------------------------------------------------------
+try {
+
+    /* ==================================================
+       MODE : NORMAL (ชั้นเรียน)
+    ================================================== */
     if ($mode === 'normal') {
 
-        $s_pid    = $_POST['s_pid']    ?? null;
-        $t_pid    = $_POST['t_pid']    ?? null;
-        $sub_code = $_POST['sub_code'] ?? null;
-        $time     = $_POST['time']     ?? null;
+        // 👉 ใช้ POST เท่านั้น (ไม่พึ่ง session)
+        $c = [
+            's_pid'    => $_POST['s_pid'] ?? null,
+            't_pid'    => $_POST['t_pid'] ?? null,
+            'sub_code' => $_POST['sub_code'] ?? null,
+            'time'     => $_POST['time'] ?? null,
+        ];
 
-        if (!$s_pid || !$t_pid || !$sub_code || !$time) {
-            redirect_with_flash_message("ข้อมูลที่จำเป็นสำหรับการบันทึกไม่ครบถ้วน (normal)");
+        foreach ($c as $k => $v) {
+            if (empty($v)) {
+                throw new Exception("ข้อมูล normal ไม่ครบ: {$k}");
+            }
         }
 
-        // ลบคะแนนเก่า (PDO)
-        $sql_del = "DELETE FROM satisfaction_answers 
-                    WHERE supervisor_p_id = :sid 
-                      AND teacher_t_pid   = :tid 
-                      AND subject_code    = :scode 
-                      AND inspection_time = :time";
-
-        $stmt_del = $conn->prepare($sql_del);
-        $stmt_del->execute([
-            ':sid'   => $s_pid,
-            ':tid'   => $t_pid,
-            ':scode' => $sub_code,
-            ':time'  => $time
+        /* === กันบันทึกซ้ำ === */
+        $chk = $conn->prepare("
+            SELECT 1
+            FROM satisfaction_answers
+            WHERE supervisor_p_id = ?
+              AND teacher_t_pid   = ?
+              AND subject_code    = ?
+              AND inspection_time = ?
+            LIMIT 1
+        ");
+        $chk->execute([
+            $c['s_pid'],
+            $c['t_pid'],
+            $c['sub_code'],
+            $c['time']
         ]);
 
-        // Insert คะแนนใหม่
-        $sql_answer = "INSERT INTO satisfaction_answers 
-                       (supervisor_p_id, teacher_t_pid, subject_code, inspection_time, question_id, rating) 
-                       VALUES (:sid, :tid, :scode, :time, :qid, :rate)";
-        $stmt_answer = $conn->prepare($sql_answer);
+        if ($chk->fetch()) {
+            throw new Exception('ท่านได้ทำการประเมินชั้นเรียนนี้ไปแล้ว');
+        }
 
-        foreach ($ratings as $question_id => $rating) {
-            $stmt_answer->execute([
-                ':sid'   => $s_pid,
-                ':tid'   => $t_pid,
-                ':scode' => $sub_code,
-                ':time'  => $time,
-                ':qid'   => (int)$question_id,
-                ':rate'  => (int)$rating
+        /* === บันทึกคะแนน === */
+        $stmt = $conn->prepare("
+            INSERT INTO satisfaction_answers
+            (supervisor_p_id, teacher_t_pid, subject_code, inspection_time, question_id, rating)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ");
+
+        foreach ($ratings as $qid => $score) {
+            $stmt->execute([
+                $c['s_pid'],
+                $c['t_pid'],
+                $c['sub_code'],
+                $c['time'],
+                $qid,
+                $score
             ]);
         }
 
-        // อัปเดตสถานะใน session
-        $sql_update = "UPDATE supervision_sessions 
-                       SET satisfaction_suggestion = :sugg, 
-                           satisfaction_date       = NOW(), 
-                           satisfaction_submitted  = 1 
-                       WHERE supervisor_p_id = :sid 
-                         AND teacher_t_pid   = :tid 
-                         AND subject_code    = :scode 
-                         AND inspection_time = :time";
-
-        $stmt_upd = $conn->prepare($sql_update);
-        $stmt_upd->execute([
-            ':sugg'  => $overall_suggestion,
-            ':sid'   => $s_pid,
-            ':tid'   => $t_pid,
-            ':scode' => $sub_code,
-            ':time'  => $time
-        ]);
-
-        // เตรียมข้อมูล Redirect
-        $redirect_target = 'satisfaction_form.php';
-        $redirect_params = [
-            'mode'     => 'normal',
-            's_pid'    => $s_pid,
-            't_pid'    => $t_pid,
-            'sub_code' => $sub_code,
-            'time'     => $time
-        ];
-
-        // ---------------------------------------------------------
-        // [QUICK WIN] จุดเน้น (quickwin)
-        // ---------------------------------------------------------
-    } elseif ($mode === 'quickwin') {
-
-        $t_id             = $_POST['t_id']             ?? null; // ในฟอร์มใช้ t_id แต่ค่าคือ pid
-        $p_id             = $_POST['p_id']             ?? null;
-        $supervision_date = $_POST['supervision_date'] ?? null;
-
-        if (!$t_id || !$p_id || !$supervision_date) {
-            redirect_with_flash_message("ข้อมูลที่จำเป็นสำหรับการบันทึกไม่ครบถ้วน (quickwin)");
-        }
-
-        // ลบคะแนนเก่า (แก้ไข t_id -> t_pid)
-        $sql_del = "DELETE FROM quickwin_satisfaction_answers 
-                    WHERE t_pid            = :tid 
-                      AND p_id             = :pid 
-                      AND supervision_date = :sdate";
-
-        $stmt_del = $conn->prepare($sql_del);
-        $stmt_del->execute([
-            ':tid'   => $t_id,
-            ':pid'   => $p_id,
-            ':sdate' => $supervision_date
-        ]);
-
-        // Insert คะแนนใหม่ (แก้ไข t_id -> t_pid)
-        $sql_answer = "INSERT INTO quickwin_satisfaction_answers 
-                       (t_pid, p_id, supervision_date, question_id, rating) 
-                       VALUES (:tid, :pid, :sdate, :qid, :rate)";
-        $stmt_answer = $conn->prepare($sql_answer);
-
-        foreach ($ratings as $question_id => $rating) {
-            $stmt_answer->execute([
-                ':tid'   => $t_id,
-                ':pid'   => $p_id,
-                ':sdate' => $supervision_date,
-                ':qid'   => (int)$question_id,
-                ':rate'  => (int)$rating
+        /* === บันทึกข้อเสนอแนะ === */
+        if ($suggestion !== '') {
+            $stmt = $conn->prepare("
+        UPDATE supervision_sessions
+        SET satisfaction_suggestion = ?
+        WHERE supervisor_p_id = ?
+          AND teacher_t_pid   = ?
+          AND subject_code    = ?
+          AND inspection_time = ?
+          AND deleted_at IS NULL
+    ");
+            $stmt->execute([
+                $suggestion,
+                $c['s_pid'],
+                $c['t_pid'],
+                $c['sub_code'],
+                $c['time']
             ]);
         }
-
-        // อัปเดตสถานะใน quick_win (แก้ไข t_id -> t_pid)
-        $sql_update = "UPDATE quick_win 
-                       SET satisfaction_suggestion = :sugg, 
-                           satisfaction_date       = NOW(), 
-                           satisfaction_submitted  = 1 
-                       WHERE t_pid            = :tid 
-                         AND p_id             = :pid 
-                         AND supervision_date = :sdate";
-
-        $stmt_upd = $conn->prepare($sql_update);
-        $stmt_upd->execute([
-            ':sugg'  => $overall_suggestion,
-            ':tid'   => $t_id,
-            ':pid'   => $p_id,
-            ':sdate' => $supervision_date
-        ]);
-
-        // เตรียมข้อมูล Redirect
-        $redirect_target = 'satisfaction_form.php';
-        $redirect_params = [
-            'mode' => 'quickwin',
-            't_id' => $t_id,
-            'p_id' => $p_id,
-            'date' => $supervision_date
-        ];
-    } else {
-        throw new Exception("Unknown mode: " . $mode);
     }
 
-    // ---------------------------------------------------------
-    // Commit & Redirect
-    // ---------------------------------------------------------
+    /* ==================================================
+       MODE : QUICKWIN
+    ================================================== */
+    if ($mode === 'quickwin') {
+
+        if (!isset($_SESSION['quickwin_context'])) {
+            throw new Exception('quickwin_context ไม่พบใน session');
+        }
+
+        $c = $_SESSION['quickwin_context'];
+
+        foreach (['t_pid', 'p_id', 'date'] as $k) {
+            if (empty($c[$k])) {
+                throw new Exception("quickwin_context ไม่ครบ: {$k}");
+            }
+        }
+
+        /* === กันบันทึกซ้ำ === */
+        $chk = $conn->prepare("
+            SELECT 1
+            FROM quickwin_satisfaction_answers
+            WHERE t_pid = ?
+              AND p_id  = ?
+              AND supervision_date = ?
+            LIMIT 1
+        ");
+        $chk->execute([
+            $c['t_pid'],
+            $c['p_id'],
+            $c['date']
+        ]);
+
+        if ($chk->fetch()) {
+            throw new Exception('ท่านได้ทำการประเมิน Quick Win นี้ไปแล้ว');
+        }
+
+        /* === บันทึกคะแนน === */
+        $stmt = $conn->prepare("
+            INSERT INTO quickwin_satisfaction_answers
+            (t_pid, p_id, supervision_date, question_id, rating)
+            VALUES (?, ?, ?, ?, ?)
+        ");
+
+        foreach ($ratings as $qid => $score) {
+            $stmt->execute([
+                $c['t_pid'],
+                $c['p_id'],
+                $c['date'],
+                $qid,
+                $score
+            ]);
+        }
+
+        /* === บันทึกข้อเสนอแนะ === */
+        if ($suggestion !== '') {
+            $stmt = $conn->prepare("
+        UPDATE quick_win
+        SET satisfaction_suggestion = ?
+        WHERE t_pid = ?
+          AND p_id  = ?
+          AND supervision_date = ?
+    ");
+            $stmt->execute([
+                $suggestion,
+                $c['t_pid'],
+                $c['p_id'],
+                $c['date']
+            ]);
+        }
+    }
+
+    /* ===============================
+       COMMIT
+    =============================== */
     $conn->commit();
 
-    $_SESSION['flash_message']      = "บันทึกการประเมินเรียบร้อยแล้ว";
-    $_SESSION['flash_message_type'] = "success";
+    // ===== redirect หลังบันทึกสำเร็จ =====
+    $teacher_pid = $c['t_pid'] ?? null;
 
-    // Auto-submit Form เพื่อ Redirect แบบ POST (ปลอดภัยกว่า GET)
-    echo '<!DOCTYPE html>
-    <html>
-    <head><title>Redirecting...</title></head>
-    <body>
-        <form id="redirectForm" action="' . htmlspecialchars($redirect_target) . '" method="post">';
-
-    foreach ($redirect_params as $name => $value) {
-        echo '<input type="hidden" name="' . htmlspecialchars($name) . '" value="' . htmlspecialchars($value) . '">';
-    }
-
-    echo '  </form>
-        <script type="text/javascript">
-            document.getElementById("redirectForm").submit();
-        </script>
-    </body>
-    </html>';
+    header(
+        'Location: ../session_details.php?teacher_pid=' . urlencode($teacher_pid) . '&success=1'
+    );
     exit;
-} catch (PDOException $e) {
-    $conn->rollBack();
-    error_log("Save Satisfaction DB Error: " . $e->getMessage());
-    redirect_with_flash_message("เกิดข้อผิดพลาดฐานข้อมูล: " . $e->getMessage());
 } catch (Exception $e) {
     $conn->rollBack();
     error_log("Save Satisfaction Error: " . $e->getMessage());
-    redirect_with_flash_message("เกิดข้อผิดพลาด: " . $e->getMessage());
+
+    $_SESSION['flash_message'] = $e->getMessage();
+    $_SESSION['flash_type']    = 'warning';
+
+    header('Location: ../session_details.php?teacher_pid=' . urlencode($c['t_pid'] ?? ''));
+    exit;
 }

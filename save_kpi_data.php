@@ -1,6 +1,6 @@
 <?php
 // ===========================================
-// save_kpi_data.php (FIX DUPLICATE INSPECTION)
+// save_kpi_data.php (FINAL VERSION)
 // ===========================================
 
 error_reporting(E_ALL);
@@ -16,89 +16,132 @@ if (!isset($_SESSION['user_id'])) {
 
 require_once __DIR__ . '/config/db_connect.php';
 
-// -------------------------------
+// --------------------------------------------
+// Helper Functions
+// --------------------------------------------
 function redirect_with_message($msg, $url)
 {
     $_SESSION['flash_message'] = $msg;
-    header("Location: $url");
+    header("Location: {$url}");
     exit();
 }
 
-// -------------------------------
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    redirect_with_message('Invalid request', 'index.php');
+function getAcademicYear($date)
+{
+    $year  = (int)date('Y', strtotime($date));
+    $month = (int)date('n', strtotime($date));
+
+    // พฤษภาคม = ปีการศึกษาใหม่
+    return ($month >= 5)
+        ? $year + 543
+        : $year + 542;
 }
 
-// -------------------------------
-// รับค่าจากฟอร์ม
-// -------------------------------
-$supervisor_p_id = $_SESSION['user_id'];
-$teacher_t_pid   = $_POST['t_pid'] ?? null;
+// --------------------------------------------
+// ตรวจสอบ Method
+// --------------------------------------------
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    redirect_with_message('Invalid request method', 'index.php');
+}
 
+// --------------------------------------------
+// 1) รับค่าพื้นฐานจากฟอร์ม
+// --------------------------------------------
+$supervisor_p_id = $_SESSION['user_id'];
+
+$teacher_t_pid   = $_POST['t_pid'] ?? '';
 $subject_code    = trim($_POST['subject_code'] ?? '');
 $subject_name    = trim($_POST['subject_name'] ?? '');
-$inspection_time = intval($_POST['inspection_time'] ?? 0);
 $inspection_date = $_POST['supervision_date'] ?? date('Y-m-d');
-$overall_suggestion = trim($_POST['overall_suggestion'] ?? '');
 
+$overall_suggestion    = trim($_POST['overall_suggestion'] ?? '');
 $ratings               = $_POST['ratings'] ?? [];
 $indicator_suggestions = $_POST['indicator_suggestions'] ?? [];
 
-// -------------------------------
-// Validate
-// -------------------------------
-if (!$teacher_t_pid || !$subject_code || !$inspection_time) {
-    redirect_with_message("ข้อมูลไม่ครบถ้วน", "supervision_start.php");
+// normalize subject_code (ใช้ตรวจซ้ำ)
+$subject_code_db = preg_replace('/\s+/', '', strtolower($subject_code));
+
+// คำนวณปีการศึกษา (ใช้ทั้งไฟล์)
+$academic_year = getAcademicYear($inspection_date);
+
+// --------------------------------------------
+// Validation
+// --------------------------------------------
+if (
+    empty($teacher_t_pid) ||
+    empty($subject_code) ||
+    empty($subject_name)
+) {
+    redirect_with_message(
+        'ข้อมูลไม่ครบถ้วน (ครู / รหัสวิชา / ชื่อวิชา)',
+        'summary.php'
+    );
 }
 
-$conn->beginTransaction();
-
 try {
+    $conn->beginTransaction();
 
-    // =====================================================
-    // A) ตรวจซ้ำ (ซ้ำได้ ยกเว้น ชุดเดิม)
-    // =====================================================
-    $checkSql = "
-        SELECT 1 FROM supervision_sessions
-        WHERE supervisor_p_id = ?
-          AND teacher_t_pid   = ?
-          AND subject_code    = ?
-          AND inspection_time = ?
+    // --------------------------------------------
+    // 2) 🔒 ตรวจซ้ำภายใน 14 วัน
+    // --------------------------------------------
+    $sql14 = "
+        SELECT 1
+        FROM supervision_sessions
+        WHERE teacher_t_pid = ?
+          AND REPLACE(LOWER(subject_code),' ','') = ?
+          AND inspection_date >= DATE_SUB(CURDATE(), INTERVAL 14 DAY)
+        LIMIT 1
     ";
-    $stmtCheck = $conn->prepare($checkSql);
-    $stmtCheck->execute([
-        $supervisor_p_id,
-        $teacher_t_pid,
-        $subject_code,
-        $inspection_time
-    ]);
+    $stmt14 = $conn->prepare($sql14);
+    $stmt14->execute([$teacher_t_pid, $subject_code_db]);
 
-    if ($stmtCheck->fetch()) {
+    if ($stmt14->fetch()) {
+        $conn->rollBack();
+
+        $_SESSION['flash_error'] = [
+            'title' => 'ไม่สามารถบันทึกได้',
+            'text'  => 'ครูคนนี้ได้รับการนิเทศในรายวิชานี้ภายใน 14 วันที่ผ่านมาแล้ว',
+            'icon'  => 'warning'
+        ];
+
+        header("Location: summary.php");
+        exit;
+    }
+
+    // --------------------------------------------
+    // 3) คำนวณ inspection_time (1–9)
+    // --------------------------------------------
+    $sqlTime = "
+        SELECT MAX(inspection_time)
+        FROM supervision_sessions
+        WHERE teacher_t_pid = ?
+          AND REPLACE(LOWER(subject_code),' ','') = ?
+        FOR UPDATE
+    ";
+    $stmtTime = $conn->prepare($sqlTime);
+    $stmtTime->execute([$teacher_t_pid, $subject_code_db]);
+    $lastTime = (int)$stmtTime->fetchColumn();
+
+    $inspection_time = $lastTime + 1;
+
+    if ($inspection_time > 9) {
         $conn->rollBack();
         redirect_with_message(
-            "มีข้อมูลการนิเทศครั้งที่ {$inspection_time} ของวิชานี้แล้ว",
-            "supervision_start.php"
+            "❌ วิชานี้ถูกนิเทศครบ 9 ครั้งแล้ว",
+            "summary.php"
         );
     }
 
-    // =====================================================
-    // B) supervision_sessions (INSERT ใหม่เสมอ)
-    // =====================================================
+    // --------------------------------------------
+    // 4) บันทึก supervision_sessions
+    // --------------------------------------------
     $sqlSession = "
         INSERT INTO supervision_sessions
-        (
-            supervisor_p_id,
-            teacher_t_pid,
-            subject_code,
-            subject_name,
-            inspection_time,
-            inspection_date,
-            overall_suggestion,
-            supervision_date
-        )
+            (supervisor_p_id, teacher_t_pid, subject_code, subject_name,
+             inspection_time, inspection_date, overall_suggestion,
+             supervision_date)
         VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
     ";
-
     $stmtSession = $conn->prepare($sqlSession);
     $stmtSession->execute([
         $supervisor_p_id,
@@ -110,21 +153,24 @@ try {
         $overall_suggestion
     ]);
 
-    // =====================================================
-    // C) kpi_answers
-    // =====================================================
+    // --------------------------------------------
+    // 5) บันทึกคะแนน KPI
+    // --------------------------------------------
     if (!empty($ratings)) {
-        $sqlRating = "
+        $stmtRating = $conn->prepare("
             INSERT INTO kpi_answers
-            (question_id, rating_score, supervisor_p_id, teacher_t_pid, subject_code, inspection_time)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ";
-        $stmtRating = $conn->prepare($sqlRating);
+                (question_id, rating_score, supervisor_p_id,
+                 teacher_t_pid, subject_code,
+                 inspection_time)
+            VALUES (?, ?, ?, ?, ?, ?, )
+        ");
 
         foreach ($ratings as $qid => $score) {
+            if ($score === '') continue;
+
             $stmtRating->execute([
-                intval($qid),
-                intval($score),
+                (int)$qid,
+                (int)$score,
                 $supervisor_p_id,
                 $teacher_t_pid,
                 $subject_code,
@@ -133,70 +179,95 @@ try {
         }
     }
 
-    // =====================================================
-    // D) kpi_indicator_suggestions
-    // =====================================================
+    // --------------------------------------------
+    // 6) บันทึกข้อเสนอแนะรายตัวชี้วัด
+    // --------------------------------------------
     if (!empty($indicator_suggestions)) {
-        $sqlSug = "
+        $stmtSug = $conn->prepare("
             INSERT INTO kpi_indicator_suggestions
-            (indicator_id, suggestion_text, supervisor_p_id, teacher_t_pid, subject_code, inspection_time)
+                (indicator_id, suggestion_text,
+                 supervisor_p_id, teacher_t_pid,
+                 subject_code, inspection_time)
             VALUES (?, ?, ?, ?, ?, ?)
-        ";
-        $stmtSug = $conn->prepare($sqlSug);
+        ");
 
         foreach ($indicator_suggestions as $iid => $text) {
-            $text = trim($text);
-            if ($text !== '') {
-                $stmtSug->execute([
-                    intval($iid),
-                    $text,
-                    $supervisor_p_id,
-                    $teacher_t_pid,
-                    $subject_code,
-                    $inspection_time
-                ]);
-            }
+            if (trim($text) === '') continue;
+
+            $stmtSug->execute([
+                (int)$iid,
+                trim($text),
+                $supervisor_p_id,
+                $teacher_t_pid,
+                $subject_code,
+                $inspection_time
+            ]);
         }
     }
 
-    // =====================================================
-    // E) Upload Images
-    // =====================================================
+    // --------------------------------------------
+    // 7) อัปโหลดรูปภาพ
+    // --------------------------------------------
     $uploadDir = __DIR__ . '/uploads/';
     if (!is_dir($uploadDir)) {
         mkdir($uploadDir, 0755, true);
     }
 
-    if (!empty($_FILES['images']['name'][0])) {
+    if (
+        !empty($_FILES['images']['tmp_name']) &&
+        is_array($_FILES['images']['tmp_name']) &&
+        !empty($_FILES['images']['tmp_name'][0])
+    ) {
         $stmtImg = $conn->prepare("
             INSERT INTO images
-            (supervisor_p_id, teacher_t_pid, subject_code, inspection_time, file_name)
-            VALUES (?, ?, ?, ?, ?)
+                (supervisor_p_id, teacher_t_pid,
+                 subject_code, inspection_time,
+                 file_name)
+            VALUES (?, ?, ?, ?, ?, )
         ");
 
-        for ($i = 0; $i < min(2, count($_FILES['images']['name'])); $i++) {
-            if ($_FILES['images']['error'][$i] === 0) {
-                $ext = pathinfo($_FILES['images']['name'][$i], PATHINFO_EXTENSION);
-                $newName = uniqid('img_', true) . '.' . $ext;
-                move_uploaded_file($_FILES['images']['tmp_name'][$i], $uploadDir . $newName);
+        $maxFiles = min(2, count($_FILES['images']['tmp_name']));
 
-                $stmtImg->execute([
-                    $supervisor_p_id,
-                    $teacher_t_pid,
-                    $subject_code,
-                    $inspection_time,
-                    $newName
-                ]);
+        for ($i = 0; $i < $maxFiles; $i++) {
+
+            if ($_FILES['images']['error'][$i] !== UPLOAD_ERR_OK) continue;
+
+            $tmpPath = $_FILES['images']['tmp_name'][$i];
+            if (!is_uploaded_file($tmpPath)) continue;
+
+            $ext = strtolower(pathinfo($_FILES['images']['name'][$i], PATHINFO_EXTENSION));
+            if (!in_array($ext, ['jpg', 'jpeg', 'png', 'webp'])) continue;
+
+            $newName = uniqid('img_', true) . '.' . $ext;
+            $target  = $uploadDir . $newName;
+
+            if (!move_uploaded_file($tmpPath, $target)) {
+                error_log("UPLOAD FAILED: {$target}");
+                continue;
             }
+
+            $stmtImg->execute([
+                $supervisor_p_id,
+                $teacher_t_pid,
+                $subject_code,
+                $inspection_time,
+                $newName
+            ]);
         }
     }
 
+    // --------------------------------------------
+    // 8) Commit
+    // --------------------------------------------
     $conn->commit();
-    redirect_with_message("บันทึกข้อมูลเรียบร้อยแล้ว", "index.php");
+
+    redirect_with_message(
+        "✅ บันทึกข้อมูลการนิเทศสำเร็จ (ปีการศึกษา {$academic_year})",
+        "index.php"
+    );
 } catch (Exception $e) {
 
     $conn->rollBack();
     error_log("SAVE_KPI_ERROR: " . $e->getMessage());
-    echo "<pre style='color:red'>{$e->getMessage()}</pre>";
-    exit();
+    exit("เกิดข้อผิดพลาดทางระบบ กรุณาตรวจสอบ error log");
 }

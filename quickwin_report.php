@@ -87,6 +87,27 @@ try {
 } catch (PDOException $e) {
     die("Database Error: " . $e->getMessage());
 }
+
+// ========================
+// 3. ดึงรูปภาพประกอบ Quick Win
+// ========================
+$sql_imgs = "
+    SELECT file_name
+    FROM images
+    WHERE supervisor_p_id = :pid
+      AND teacher_t_pid = :tid
+      AND subject_code IS NULL
+      AND inspection_time IS NULL
+    ORDER BY uploaded_on ASC
+";
+
+$stmt_imgs = $conn->prepare($sql_imgs);
+$stmt_imgs->execute([
+    ':pid' => $p_id,
+    ':tid' => $t_id
+]);
+
+$images = $stmt_imgs->fetchAll(PDO::FETCH_COLUMN);
 ?>
 <!DOCTYPE html>
 <html lang="th">
@@ -166,7 +187,7 @@ try {
                 <?php if (!empty($info['option_other'])): ?>
                     <div class="row mb-2 mt-2">
                         <div class="col-12">
-                            <strong>รายละเอียดเพิ่มเติม (หมายเหตุ):</strong><br>
+                            <strong>หรือ อื่นๆ ( กรณีหัวข้อที่ต้องการนิเทศไม่ได้อยู่ในรายการด้านบน )</strong><br>
                             <div class="p-2 bg-light border rounded">
                                 <?php echo nl2br(htmlspecialchars($info['option_other'])); ?>
                             </div>
@@ -194,6 +215,27 @@ try {
                 </div>
             <?php endif; ?>
 
+            <?php if (!empty($images)): ?>
+                <h5 class="header-title mt-4">
+                    <i class="fas fa-images"></i> รูปภาพประกอบการนิเทศ
+                </h5>
+
+                <div class="row g-3">
+                    <?php foreach ($images as $img): ?>
+                        <div class="col-6 col-md-4">
+                            <div class="card shadow-sm">
+                                <img
+                                    src="uploads/quickwin/<?php echo htmlspecialchars($img); ?>"
+                                    class="card-img-top img-fluid"
+                                    style="height: 180px; object-fit: cover; cursor: pointer;"
+                                    onclick="openImage(this.src)"
+                                    alt="รูปประกอบการนิเทศ">
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
+
             <div class="text-center mt-5 no-print">
                 <button onclick="window.close()" class="btn btn-danger me-2">
                     <i class="fas fa-times"></i> ปิดรายงาน
@@ -208,6 +250,35 @@ try {
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        function openImage(src) {
+            const win = window.open("", "_blank");
+            win.document.write(`
+        <html>
+        <head>
+            <title>ดูรูปภาพ</title>
+            <style>
+                body {
+                    margin: 0;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    background: #000;
+                }
+                img {
+                    max-width: 100%;
+                    max-height: 100vh;
+                }
+            </style>
+        </head>
+        <body>
+            <img src="${src}">
+        </body>
+        </html>
+    `);
+        }
+    </script>
 </body>
 
 </html>

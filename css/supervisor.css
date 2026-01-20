@@ -14,37 +14,39 @@
    GLOBAL
    ========================= */
 
-html, body {
-    height: 100%;
+html,
+body {
+    height: auto;
+    min-height: 100%;
 }
 
 body {
     background: url('../images/bg001.jpg') no-repeat center center fixed;
     background-size: cover;
     font-family: "Inter", sans-serif;
-    overflow: hidden;
+
+    /* ✅ อนุญาต scroll */
+    overflow-y: auto;
+    overflow-x: hidden;
 }
+
 
 /* =========================
    LAYOUT
    ========================= */
 
 .container {
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    padding-bottom: 20px;
+    padding-bottom: 40px;
+    /* เผื่อ pagination */
 }
 
 .card-custom {
     flex: 1;
     display: flex;
     flex-direction: column;
-    background: var(--card-bg);
-    border-radius: 14px;
-    box-shadow: 0 8px 30px rgba(31, 45, 61, 0.08);
-    overflow: hidden;
+    overflow: visible;
 }
+
 
 /* =========================
    PAGE TITLE
@@ -127,4 +129,130 @@ body {
     padding: 20px;
     color: var(--primary-700);
     font-weight: bold;
+}
+
+/* ===== Supervisor Card ===== */
+.supervisor-card {
+    overflow: visible;
+}
+
+
+/* ===== Header ===== */
+.supervisor-header {
+    background: linear-gradient(135deg, #f8f9fa, #ffffff);
+    padding: 16px 24px;
+    border-bottom: 1px solid #e9ecef;
+}
+
+/* ===== Table spacing ===== */
+.supervisor-card .card-body {
+    overflow-x: auto;
+    overflow-y: visible;
+}
+
+/* ===== Buttons ===== */
+.supervisor-header .btn {
+    border-radius: 8px;
+    font-weight: 500;
+}
+
+/* ===== Search input ===== */
+#searchInput {
+    border-radius: 10px;
+    padding: 10px 14px;
+}
+
+/* ตาราง */
+.table thead th {
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.table td {
+    vertical-align: middle;
+}
+
+/* ปุ่มจัดการ */
+.table .btn-sm {
+    padding: 4px 8px;
+    border-radius: 6px;
+}
+
+/* Modal */
+.modal-header {
+    border-bottom: none;
+}
+
+.modal-footer {
+    border-top: none;
+}
+
+/* =========================
+   BIG TITLE (Modern)
+   ========================= */
+.page-title-lg {
+    font-size: 1.75rem;
+    /* ใหญ่ขึ้น */
+    font-weight: 800;
+    color: #0d6efd;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.page-title-lg i {
+    font-size: 1.9rem;
+    background: linear-gradient(135deg, #0d6efd, #0053ba);
+    color: #fff;
+    padding: 12px;
+    border-radius: 14px;
+    box-shadow: 0 6px 16px rgba(13, 110, 253, .35);
+}
+
+/* =========================
+   BIG BUTTONS
+   ========================= */
+.btn-add-lg {
+    background: linear-gradient(135deg, #28a745, #1e7e34);
+    color: #fff;
+    font-size: 1.05rem;
+    padding: 10px 20px;
+    border-radius: 12px;
+    font-weight: 600;
+    border: none;
+    box-shadow: 0 6px 18px rgba(40, 167, 69, .35);
+    transition: all .25s ease;
+}
+
+.btn-add-lg:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 22px rgba(40, 167, 69, .45);
+    color: #fff;
+}
+
+/* =========================
+   BACK BUTTON
+   ========================= */
+.btn-back-lg {
+    background: #f8f9fa;
+    color: #495057;
+    font-size: 1.05rem;
+    padding: 10px 18px;
+    border-radius: 12px;
+    font-weight: 600;
+    border: 1px solid #dee2e6;
+    transition: all .25s ease;
+}
+
+.btn-back-lg:hover {
+    background: #e9ecef;
+    color: #212529;
+    transform: translateY(-1px);
+}
+
+/* =========================
+   HEADER SPACE (หายใจได้)
+   ========================= */
+.supervisor-header {
+    padding: 20px 28px !important;
 }

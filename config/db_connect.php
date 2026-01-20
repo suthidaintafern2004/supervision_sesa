@@ -5,9 +5,9 @@
 // ⚠️ ส่วนสำหรับ Admin (แก้ไขข้อมูลการเชื่อมต่อตรงนี้)
 // ----------------------------------------------------------------
 $host     = "localhost";        // ถ้า Database อยู่เครื่องเดียวกับเว็บใช้ localhost (ถ้าอยู่คนละเครื่องให้ใส่ IP)
-$dbname   = "sesa_db";      // ชื่อฐานข้อมูล (ควรตรงกับไฟล์ .sql ที่ Import)
-$username = "root";             // ⚠️ แก้เป็น Username ของ Server
-$password = "";                 // ⚠️ แก้เป็น Password ของ Server
+$dbname   = "std65104db";      // ชื่อฐานข้อมูล (ควรตรงกับไฟล์ .sql ที่ Import)
+$username = "std65104";             // ⚠️ แก้เป็น Username ของ Server
+$password = "pro65104";                 // ⚠️ แก้เป็น Password ของ Server
 
 // $username = "sesalpglpn_supervision"; // เปลี่ยนเป็นชื่อผู้ใช้ MySQL ของคุณ
 // $password = "@AS5Kf3ol#mljiv1"; // เปลี่ยนเป็นรหัสผ่าน MySQL ของคุณ

@@ -1,54 +1,48 @@
 <?php
-// File: api/update_supervisor.php
-header('Content-Type: application/json');
+session_start();
 require_once '../config/db_connect.php';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // 1. รับค่า
-    $p_id        = $_POST['p_id'] ?? '';
-    $prefix_id   = $_POST['prefix_id'] ?? '';
-    $fname       = trim($_POST['fname'] ?? '');
-    $lname       = trim($_POST['lname'] ?? '');
-    $office_id   = $_POST['office_id'] ?? '';
-    $position_id = $_POST['position_id'] ?? '';
-    $rank_id     = $_POST['rank_id'] ?? null;
+if (!isset($_SESSION['is_logged_in']) || $_SESSION['role'] !== 'admin') {
+    echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+    exit;
+}
 
-    // 2. ตรวจสอบความครบถ้วน
-    if (empty($p_id) || empty($prefix_id) || empty($fname) || empty($lname) || empty($office_id) || empty($position_id)) {
-        echo json_encode(['success' => false, 'message' => 'กรุณากรอกข้อมูลให้ครบถ้วน']);
-        exit;
-    }
+try {
+    $p_id        = $_POST['p_id'];
+    $prefix_id   = $_POST['prefix_id'];
+    $fname       = $_POST['fname'];
+    $lname       = $_POST['lname'];
+    $office_id   = $_POST['office_id'];
+    $position_id = $_POST['position_id'];
+    $rank_id     = $_POST['rank_id'] ?: null;
+    $role        = $_POST['role'];   // 🔴 จุดสำคัญ
 
-    try {
-        // 3. บันทึกข้อมูล
-        $sql = "UPDATE supervisor SET 
-                    prefix_id   = :prefix,
-                    fname       = :fname,
-                    lname       = :lname,
-                    office_id   = :office,
-                    position_id = :pos,
-                    rank_id     = :rank
-                WHERE p_id = :pid";
+    $sql = "UPDATE supervisor SET
+        prefix_id = :prefix_id,
+        fname = :fname,
+        lname = :lname,
+        office_id = :office_id,
+        position_id = :position_id,
+        rank_id = :rank_id,
+        role = :role
+    WHERE p_id = :p_id";
 
-        $stmt = $conn->prepare($sql);
-        $result = $stmt->execute([
-            ':prefix' => $prefix_id,
-            ':fname'  => $fname,
-            ':lname'  => $lname,
-            ':office' => $office_id,
-            ':pos'    => $position_id,
-            ':rank'   => empty($rank_id) ? NULL : $rank_id,
-            ':pid'    => $p_id
-        ]);
+    $stmt = $conn->prepare($sql);
+    $stmt->bindParam(':prefix_id', $prefix_id);
+    $stmt->bindParam(':fname', $fname);
+    $stmt->bindParam(':lname', $lname);
+    $stmt->bindParam(':office_id', $office_id);
+    $stmt->bindParam(':position_id', $position_id);
+    $stmt->bindParam(':rank_id', $rank_id);
+    $stmt->bindParam(':role', $role); // 🔴 ต้องมี
+    $stmt->bindParam(':p_id', $p_id);
 
-        if ($result) {
-            echo json_encode(['success' => true, 'message' => 'บันทึกสำเร็จ']);
-        } else {
-            echo json_encode(['success' => false, 'message' => 'ไม่สามารถบันทึกข้อมูลได้']);
-        }
-    } catch (PDOException $e) {
-        echo json_encode(['success' => false, 'message' => 'DB Error: ' . $e->getMessage()]);
-    }
-} else {
-    echo json_encode(['success' => false, 'message' => 'Invalid Request Method']);
+    $stmt->execute();
+
+    echo json_encode(['success' => true]);
+} catch (PDOException $e) {
+    echo json_encode([
+        'success' => false,
+        'message' => $e->getMessage()
+    ]);
 }
