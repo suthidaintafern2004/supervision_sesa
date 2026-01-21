@@ -26,17 +26,6 @@ function redirect_with_message($msg, $url)
     exit();
 }
 
-function getAcademicYear($date)
-{
-    $year  = (int)date('Y', strtotime($date));
-    $month = (int)date('n', strtotime($date));
-
-    // พฤษภาคม = ปีการศึกษาใหม่
-    return ($month >= 5)
-        ? $year + 543
-        : $year + 542;
-}
-
 // --------------------------------------------
 // ตรวจสอบ Method
 // --------------------------------------------
@@ -61,8 +50,11 @@ $indicator_suggestions = $_POST['indicator_suggestions'] ?? [];
 // normalize subject_code (ใช้ตรวจซ้ำ)
 $subject_code_db = preg_replace('/\s+/', '', strtolower($subject_code));
 
-// คำนวณปีการศึกษา (ใช้ทั้งไฟล์)
-$academic_year = getAcademicYear($inspection_date);
+$academic_year = (int)($_POST['academic_year'] ?? 0);
+
+if ($academic_year <= 0) {
+    redirect_with_message('กรุณาเลือกปีการศึกษา', 'summary.php');
+}
 
 // --------------------------------------------
 // Validation
@@ -90,10 +82,11 @@ try {
         WHERE teacher_t_pid = ?
           AND REPLACE(LOWER(subject_code),' ','') = ?
           AND inspection_date >= DATE_SUB(CURDATE(), INTERVAL 14 DAY)
+          AND academic_year = ?
         LIMIT 1
     ";
     $stmt14 = $conn->prepare($sql14);
-    $stmt14->execute([$teacher_t_pid, $subject_code_db]);
+    $stmt14->execute([$teacher_t_pid, $subject_code_db, $academic_year]);
 
     if ($stmt14->fetch()) {
         $conn->rollBack();
@@ -116,10 +109,11 @@ try {
         FROM supervision_sessions
         WHERE teacher_t_pid = ?
           AND REPLACE(LOWER(subject_code),' ','') = ?
+          AND academic_year = ?
         FOR UPDATE
     ";
     $stmtTime = $conn->prepare($sqlTime);
-    $stmtTime->execute([$teacher_t_pid, $subject_code_db]);
+    $stmtTime->execute([$teacher_t_pid, $subject_code_db, $academic_year]);
     $lastTime = (int)$stmtTime->fetchColumn();
 
     $inspection_time = $lastTime + 1;
@@ -136,12 +130,21 @@ try {
     // 4) บันทึก supervision_sessions
     // --------------------------------------------
     $sqlSession = "
-        INSERT INTO supervision_sessions
-            (supervisor_p_id, teacher_t_pid, subject_code, subject_name,
-             inspection_time, inspection_date, overall_suggestion,
-             supervision_date)
-        VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
-    ";
+            INSERT INTO supervision_sessions
+            (
+            supervisor_p_id,
+            teacher_t_pid,
+            subject_code,
+            subject_name,
+            inspection_time,
+            inspection_date,
+            academic_year,
+            overall_suggestion,
+            supervision_date
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
+        ";
+
     $stmtSession = $conn->prepare($sqlSession);
     $stmtSession->execute([
         $supervisor_p_id,
@@ -150,8 +153,10 @@ try {
         $subject_name,
         $inspection_time,
         $inspection_date,
+        $academic_year,
         $overall_suggestion
     ]);
+
 
     // --------------------------------------------
     // 5) บันทึกคะแนน KPI
@@ -160,9 +165,8 @@ try {
         $stmtRating = $conn->prepare("
             INSERT INTO kpi_answers
                 (question_id, rating_score, supervisor_p_id,
-                 teacher_t_pid, subject_code,
-                 inspection_time)
-            VALUES (?, ?, ?, ?, ?, ?, )
+                 teacher_t_pid, subject_code, inspection_time, academic_year)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         ");
 
         foreach ($ratings as $qid => $score) {
@@ -174,7 +178,8 @@ try {
                 $supervisor_p_id,
                 $teacher_t_pid,
                 $subject_code,
-                $inspection_time
+                $inspection_time,
+                $academic_year
             ]);
         }
     }
@@ -184,12 +189,19 @@ try {
     // --------------------------------------------
     if (!empty($indicator_suggestions)) {
         $stmtSug = $conn->prepare("
-            INSERT INTO kpi_indicator_suggestions
-                (indicator_id, suggestion_text,
-                 supervisor_p_id, teacher_t_pid,
-                 subject_code, inspection_time)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ");
+                INSERT INTO kpi_indicator_suggestions
+                    (
+                        indicator_id,
+                        suggestion_text,
+                        supervisor_p_id,
+                        teacher_t_pid,
+                        subject_code,
+                        inspection_time,
+                        supervision_date,
+                        academic_year
+                    )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ");
 
         foreach ($indicator_suggestions as $iid => $text) {
             if (trim($text) === '') continue;
@@ -200,7 +212,9 @@ try {
                 $supervisor_p_id,
                 $teacher_t_pid,
                 $subject_code,
-                $inspection_time
+                $inspection_time,
+                $inspection_date,   // 👈 วันที่นิเทศ (ตัวเดียวกับ supervision_sessions)
+                $academic_year      // 👈 ปีการศึกษาที่เลือกจากฟอร์ม
             ]);
         }
     }
@@ -208,6 +222,7 @@ try {
     // --------------------------------------------
     // 7) อัปโหลดรูปภาพ
     // --------------------------------------------
+
     $uploadDir = __DIR__ . '/uploads/';
     if (!is_dir($uploadDir)) {
         mkdir($uploadDir, 0755, true);
@@ -218,13 +233,14 @@ try {
         is_array($_FILES['images']['tmp_name']) &&
         !empty($_FILES['images']['tmp_name'][0])
     ) {
+        $form_type = 'cr'; // class room
         $stmtImg = $conn->prepare("
-            INSERT INTO images
-                (supervisor_p_id, teacher_t_pid,
-                 subject_code, inspection_time,
-                 file_name)
-            VALUES (?, ?, ?, ?, ?, )
-        ");
+                INSERT INTO images
+                    (supervisor_p_id, teacher_t_pid,
+                    subject_code, inspection_time,
+                    file_name, academic_year, form_type)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ");
 
         $maxFiles = min(2, count($_FILES['images']['tmp_name']));
 
@@ -251,7 +267,9 @@ try {
                 $teacher_t_pid,
                 $subject_code,
                 $inspection_time,
-                $newName
+                $newName,
+                $academic_year,
+                $form_type
             ]);
         }
     }

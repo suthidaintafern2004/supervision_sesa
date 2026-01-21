@@ -3,6 +3,23 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// ===============================
+// คำนวณปีการศึกษา (เหมือนตอนบันทึกครั้งแรก)
+// ===============================
+$todayYear  = date('Y') + 543;
+$todayMonth = date('n');
+
+// ถ้าเดือน >= พ.ค. ถือว่าเป็นปีการศึกษาใหม่
+$currentAcademicYear = ($todayMonth >= 5)
+    ? $todayYear
+    : $todayYear - 1;
+
+$academicYearOptions = [
+    $currentAcademicYear - 1, // ปีก่อน
+    $currentAcademicYear,     // ปีปัจจุบัน
+    $currentAcademicYear + 1  // ปีหน้า
+];
+
 require_once '../config/db_connect.php';
 
 /* ===============================
@@ -321,7 +338,7 @@ $existing_images_db = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
 
                         <!-- รหัสวิชา -->
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <label class="fw-bold">รหัสวิชา</label>
                             <input type="text" name="subject_code"
                                 class="form-control modern-input"
@@ -329,7 +346,7 @@ $existing_images_db = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
 
                         <!-- ชื่อวิชา -->
-                        <div class="col-md-5">
+                        <div class="col-md-4">
                             <label class="fw-bold">ชื่อวิชา</label>
                             <input type="text" name="subject_name"
                                 class="form-control modern-input"
@@ -352,10 +369,35 @@ $existing_images_db = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         <!-- วันที่นิเทศ -->
                         <div class="col-md-2">
                             <label class="fw-bold">วันที่นิเทศ</label>
-                            <input type="text"
-                                class="form-control modern-input bg-light"
-                                value="<?= date('d/m/Y', strtotime($session_data['supervision_date'])) ?>"
-                                readonly>
+                            <input type="date"
+                                name="inspection_date"
+                                class="form-control modern-input"
+                                value="<?= htmlspecialchars($session_data['inspection_date']) ?>"
+                                required>
+                        </div>
+
+                        <!-- ปีการศึกษา -->
+                        <div class="col-md-2">
+                            <label class="fw-bold">ปีการศึกษา</label>
+
+                            <?php if ($isAdmin): ?>
+                                <select name="academic_year"
+                                    class="form-select modern-input"
+                                    required>
+
+                                    <?php foreach ($academicYearOptions as $year): ?>
+                                        <option value="<?= $year ?>"
+                                            <?= ($session_data['academic_year'] == $year) ? 'selected' : '' ?>>
+                                            <?= $year ?>
+                                        </option>
+                                    <?php endforeach; ?>
+
+                                </select>
+                            <?php else: ?>
+                                <div class="form-control modern-input bg-light">
+                                    ปีการศึกษา <?= htmlspecialchars($session_data['academic_year']) ?>
+                                </div>
+                            <?php endif; ?>
                         </div>
 
                     </div>

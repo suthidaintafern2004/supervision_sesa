@@ -26,6 +26,8 @@ $new_subject_code    = $_POST['subject_code'] ?? null;
 $new_subject_name    = $_POST['subject_name'] ?? null;
 $new_inspection_time = $_POST['inspection_time'] ?? null;
 $overall_suggestion  = $_POST['overall_suggestion'] ?? null;
+$new_academic_year = $_POST['academic_year'] ?? null;
+$new_inspection_date = $_POST['inspection_date'] ?? null;
 
 /* =====================================================
    3) ข้อมูลย่อย
@@ -41,7 +43,8 @@ $redirect_back = $_POST['redirect_back'] ?? '../index.php';
 ===================================================== */
 if (
     !$old_t_pid || !$old_subject_code || !$old_inspection_time || !$old_supervisor_id ||
-    !$new_supervisor_id || !$new_t_pid || !$new_subject_code || !$new_inspection_time
+    !$new_supervisor_id || !$new_t_pid || !$new_subject_code || !$new_inspection_time ||
+    !$new_academic_year || !$new_inspection_date
 ) {
     die('ข้อมูลไม่ครบ');
 }
@@ -53,7 +56,8 @@ try {
     // CHECK DATA CHANGE
     // ===============================
     $check = $conn->prepare("
-    SELECT supervisor_p_id, teacher_t_pid, subject_code, subject_name, inspection_time, overall_suggestion
+    SELECT supervisor_p_id, teacher_t_pid, subject_code, subject_name,
+       inspection_time, inspection_date, academic_year, overall_suggestion
     FROM supervision_sessions
     WHERE supervisor_p_id = ?
       AND teacher_t_pid   = ?
@@ -79,6 +83,8 @@ try {
         $oldData['subject_code']    == $new_subject_code &&
         $oldData['subject_name']    == $new_subject_name &&
         $oldData['inspection_time'] == $new_inspection_time &&
+        $oldData['academic_year']   == $new_academic_year &&
+        $oldData['inspection_date'] == $new_inspection_date &&
         trim($oldData['overall_suggestion']) == trim($overall_suggestion);
 
     if ($noChange && empty($ratings) && empty($indicator_suggestions) && empty($_FILES['images']['name'][0])) {
@@ -96,6 +102,8 @@ try {
             subject_code       = ?,
             subject_name       = ?,
             inspection_time    = ?,
+            inspection_date   = ?, 
+            academic_year      = ?, 
             overall_suggestion = ?
         WHERE supervisor_p_id = ?
           AND teacher_t_pid   = ?
@@ -110,6 +118,8 @@ try {
         $new_subject_code,
         $new_subject_name,
         $new_inspection_time,
+        $new_inspection_date,
+        $new_academic_year,
         $overall_suggestion,
         $old_supervisor_id,
         $old_t_pid,

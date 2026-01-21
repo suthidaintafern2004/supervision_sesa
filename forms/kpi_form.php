@@ -3,6 +3,26 @@ if (session_status() === PHP_SESSION_NONE) {
   session_start();
 }
 
+function getAcademicYear($date = null)
+{
+  $date = $date ?? date('Y-m-d');
+  $year  = (int)date('Y', strtotime($date));
+  $month = (int)date('n', strtotime($date));
+
+  return ($month >= 5)
+    ? $year + 543
+    : $year + 542;
+}
+
+$currentAcademicYear = getAcademicYear();
+
+$academicYears = [
+  $currentAcademicYear - 1,
+  $currentAcademicYear,
+  $currentAcademicYear + 1
+];
+
+
 // ตรวจสอบการเชื่อมต่อฐานข้อมูล
 if (file_exists('config/db_connect.php')) {
   require_once 'config/db_connect.php';
@@ -78,27 +98,69 @@ foreach ($result as $row) {
   <hr class="my-4">
 
   <h4 class="fw-bold text-success">กรอกข้อมูลการนิเทศ</h4>
-  <div class="row g-3 mt-2 mb-4">
-    <div class="col-md-3">
+  <div class="row g-3 align-items-end mt-2 mb-4">
+
+    <!-- รหัสวิชา -->
+    <div class="col-md-2">
       <label class="form-label fw-bold">รหัสวิชา</label>
-      <input type="text" name="subject_code" id="subject_code" class="form-control" required>
+      <input type="text"
+        name="subject_code"
+        id="subject_code"
+        class="form-control"
+        placeholder="ระบุรหัสวิชา"
+        required>
     </div>
-    <div class="col-md-5">
+
+    <!-- ชื่อวิชา -->
+    <div class="col-md-3">
       <label class="form-label fw-bold">ชื่อวิชา</label>
-      <input type="text" name="subject_name" id="subject_name" class="form-control" placeholder="ระบุชื่อวิชา" required>
+      <input type="text"
+        name="subject_name"
+        id="subject_name"
+        class="form-control"
+        placeholder="ระบุชื่อวิชา"
+        required>
     </div>
+
+    <!-- ครั้งที่นิเทศ -->
     <div class="col-md-2">
       <label class="form-label fw-bold text-danger">ครั้งที่นิเทศ</label>
-      <select name="inspection_time" id="inspection_time"
-        class="form-select fw-bold text-center" required>
-        <option value="">เลือกรหัสวิชาก่อน</option>
+      <select name="inspection_time"
+        id="inspection_time"
+        class="form-select fw-bold text-center"
+        required>
+        <option value="">เลือก</option>
       </select>
     </div>
+
+    <!-- วันที่นิเทศ -->
     <div class="col-md-2">
       <label class="form-label fw-bold">วันที่นิเทศ</label>
-      <input type="date" name="supervision_date" class="form-control" value="<?php echo date('Y-m-d'); ?>" required>
+      <input type="date"
+        name="supervision_date"
+        class="form-control"
+        value="<?= date('Y-m-d'); ?>"
+        required>
     </div>
+
+    <!-- ปีการศึกษา -->
+    <div class="col-md-3">
+      <label class="form-label fw-bold">ปีการศึกษา</label>
+      <select name="academic_year"
+        id="academic_year"
+        class="form-select fw-bold text-center"
+        required>
+        <?php foreach ($academicYears as $year): ?>
+          <option value="<?= $year ?>"
+            <?= $year === $currentAcademicYear ? 'selected' : '' ?>>
+            <?= $year ?>
+          </option>
+        <?php endforeach; ?>
+      </select>
+    </div>
+
   </div>
+
 
   <hr class="my-5">
 
@@ -184,17 +246,13 @@ foreach ($result as $row) {
     </button>
 
     <button type="button"
-      class="btn btn-secondary fs-5 px-4 py-2"
+      class="btn btn-danger fs-5 px-4 py-2 ms-4"
       onclick="confirmBack()">
-      ← ย้อนกลับ
+      ย้อนกลับ
     </button>
-
   </div>
-</form>
 
-<button id="scrollToTopBtn" onclick="scrollToTop()" class="btn btn-primary rounded-circle shadow" style="display:none; position:fixed; bottom:20px; right:20px; width:50px; height:50px; z-index:999;">
-  <i class="fas fa-arrow-up"></i>
-</button>
+</form>
 
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>

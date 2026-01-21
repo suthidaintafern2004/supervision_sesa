@@ -142,8 +142,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
 
                     case 'kpi_form':
-                        header("Location: forms/kpi_form.php");
-                        exit();
+                        $_SESSION['inspection_data']['render_in_summary'] = true;
+                        break;
 
                     default:
                         $error_message = 'แบบฟอร์มที่เลือกไม่ถูกต้อง';
