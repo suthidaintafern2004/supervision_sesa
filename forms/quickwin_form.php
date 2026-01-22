@@ -32,6 +32,27 @@ $teacher_pid     = $inspection_data['t_pid']           ?? '';
 $school_name     = $inspection_data['school_name']     ?? '';
 $subject_name    = $inspection_data['subject_name']    ?? '';
 
+/* =========================
+   CALCULATE ACADEMIC YEAR
+========================= */
+$currentYear  = (int)date('Y');
+$currentMonth = (int)date('n');
+
+// ปีการศึกษาปัจจุบัน (พ.ศ.)
+if ($currentMonth >= 5) {
+    $currentAcademicYear = $currentYear + 543;
+} else {
+    $currentAcademicYear = ($currentYear - 1) + 543;
+}
+
+// ตัวเลือก 3 ปี
+$academicYears = [
+    $currentAcademicYear - 1,
+    $currentAcademicYear,
+    $currentAcademicYear + 1
+];
+
+
 // 4. ดึงข้อมูลตัวเลือก (Options)
 $options = [];
 try {
@@ -84,6 +105,8 @@ $col2_options = array_slice($options, $half);
                         </h4>
                     </div>
 
+                <form action="save_quickwin_data.php" method="POST" id="quickwinForm" enctype="multipart/form-data">
+                
                     <div class="card-body p-4 p-md-5">
 
                         <div class="alert alert-light border border-secondary border-opacity-25 rounded-3 mb-4">
@@ -91,26 +114,41 @@ $col2_options = array_slice($options, $half);
                                 <i class="fas fa-id-card"></i> ข้อมูลการนิเทศ
                             </h5>
                             <div class="row g-3">
+
                                 <div class="col-md-6">
                                     <small class="text-muted d-block">ผู้นิเทศ</small>
                                     <span class="fs-5 fw-bold text-dark"><?php echo htmlspecialchars($supervisor_name); ?></span>
                                 </div>
+
                                 <div class="col-md-6">
                                     <small class="text-muted d-block">ผู้รับการนิเทศ</small>
                                     <span class="fs-5 fw-bold text-dark"><?php echo htmlspecialchars($teacher_name); ?></span>
                                 </div>
+
                                 <div class="col-md-6">
                                     <small class="text-muted d-block">โรงเรียน</small>
                                     <span><?php echo htmlspecialchars($school_name); ?></span>
                                 </div>
+
                                 <div class="col-md-6">
                                     <small class="text-muted d-block">กลุ่มสาระฯ/วิชา</small>
                                     <span><?php echo htmlspecialchars($subject_name); ?></span>
                                 </div>
+
+                                <div class="col-md-6">
+                                    <small class="text-muted d-block">ปีการศึกษา</small>
+                                    <select name="academic_year" class="form-select mt-1" required>
+                                        <?php foreach ($academicYears as $year): ?>
+                                            <option value="<?= $year ?>"
+                                                <?= ($year == $currentAcademicYear) ? 'selected' : '' ?>>
+                                                <?= $year ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+
                             </div>
                         </div>
-
-                        <form action="save_quickwin_data.php" method="POST" id="quickwinForm" enctype="multipart/form-data">
 
                             <input type="hidden" name="supervisor_p_id" value="<?php echo htmlspecialchars($supervisor_pid); ?>">
                             <input type="hidden" name="teacher_t_pid" value="<?php echo htmlspecialchars($teacher_pid); ?>">
@@ -194,9 +232,8 @@ $col2_options = array_slice($options, $half);
                                         <div class="d-flex justify-content-center gap-3">
 
                                             <!-- ปุ่มบันทึก (สีเขียว) -->
-                                            <button type="button"
-                                                class="btn btn-success btn-lg px-5 shadow"
-                                                onclick="confirmQuickWinSave()">
+                                            <button type="submit"
+                                                class="btn btn-success btn-lg px-5 shadow">
                                                 <i class="fas fa-save me-2"></i> บันทึกข้อมูล
                                             </button>
 
@@ -277,18 +314,39 @@ $col2_options = array_slice($options, $half);
     </script>
 
     <script>
-        /* ===============================
-   Fallback ป้องกัน JS พังแล้ว submit หลุด
-=============================== */
         document.getElementById('quickwinForm').addEventListener('submit', function(e) {
+
             const checkedCount = document.querySelectorAll('.qw-checkbox:checked').length;
             const otherText = document.getElementById('option_other').value.trim();
 
             if (checkedCount === 0 && otherText === '') {
                 e.preventDefault();
-                alert('กรุณาเลือกหัวข้อ Quick Win อย่างน้อย 1 ข้อ หรือระบุหัวข้ออื่น ๆ');
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'แจ้งเตือน',
+                    text: 'กรุณาเลือกหัวข้อ Quick Win อย่างน้อย 1 ข้อ หรือระบุหัวข้ออื่น ๆ',
+                    confirmButtonText: 'รับทราบ'
+                });
+                return;
             }
+
+            e.preventDefault();
+
+            Swal.fire({
+                icon: 'question',
+                title: 'ยืนยันการบันทึก',
+                text: 'ต้องการบันทึกข้อมูล Quick Win ใช่หรือไม่?',
+                showCancelButton: true,
+                confirmButtonText: 'บันทึก',
+                cancelButtonText: 'ยกเลิก'
+            }).then(result => {
+                if (result.isConfirmed) {
+                    e.target.submit();
+                }
+            });
         });
+    </script>
+
     </script>
 
     <?php if (isset($_SESSION['flash_message'])): ?>

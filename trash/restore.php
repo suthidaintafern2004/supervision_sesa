@@ -6,7 +6,7 @@ if (session_status() === PHP_SESSION_NONE) {
 require_once '../config/db_connect.php';
 
 /* =========================
-   ตรวจสอบสิทธิ์
+   AUTH
 ========================= */
 if (empty($_SESSION['user_id'])) {
     die('Unauthorized');
@@ -20,84 +20,117 @@ $supervisor_id = $_SESSION['user_id'];
 $isAdmin       = ($_SESSION['role'] ?? '') === 'admin';
 
 /* =========================
-   รับค่าจากฟอร์ม
+   RECEIVE POST
 ========================= */
-$teacher_t_pid   = $_POST['t_pid'] ?? '';
+$form_type       = $_POST['form_type'] ?? '';
+$t_pid           = $_POST['t_pid'] ?? '';
 $subject_code    = $_POST['subject_code'] ?? '';
 $inspection_time = $_POST['inspection_time'] ?? '';
-
-if (!$teacher_t_pid || !$subject_code || !$inspection_time) {
-    $_SESSION['flash_error'] = 'ข้อมูลไม่ครบ';
-    header('Location: trash_sessions.php');
-    exit;
-}
+$supervision_date = $_POST['supervision_date'] ?? '';
 
 try {
 
-    /* =========================
-       1) ตรวจว่าข้อมูลอยู่ในถังขยะจริง
-    ========================= */
-    $sqlCheck = "
-    SELECT supervisor_p_id
-    FROM supervision_sessions
-    WHERE teacher_t_pid = ?
-      AND subject_code = ?
-      AND inspection_time = ?
-      AND deleted_at IS NOT NULL
-";
+    /* ==================================================
+       CLASSROOM FORM
+    ================================================== */
+    if ($form_type === 'classroom') {
 
-    $params = [$teacher_t_pid, $subject_code, $inspection_time];
+        if (!$t_pid || !$subject_code || !$inspection_time) {
+            throw new Exception('ข้อมูลไม่ครบ');
+        }
 
-    if (!$isAdmin) {
-        $sqlCheck .= " AND supervisor_p_id = ? ";
-        $params[] = $supervisor_id;
+        $sqlCheck = "
+            SELECT supervisor_p_id
+            FROM supervision_sessions
+            WHERE teacher_t_pid = ?
+              AND subject_code = ?
+              AND inspection_time = ?
+              AND deleted_at IS NOT NULL
+        ";
+
+        $params = [$t_pid, $subject_code, $inspection_time];
+
+        if (!$isAdmin) {
+            $sqlCheck .= " AND supervisor_p_id = ? ";
+            $params[] = $supervisor_id;
+        }
+
+        $sqlCheck .= " LIMIT 1";
+
+        $stmt = $conn->prepare($sqlCheck);
+        $stmt->execute($params);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$row) {
+            throw new Exception('ไม่พบข้อมูลในถังขยะ หรือไม่มีสิทธิ์');
+        }
+
+        $restore = $conn->prepare("
+            UPDATE supervision_sessions
+            SET deleted_at = NULL
+            WHERE teacher_t_pid = ?
+              AND subject_code = ?
+              AND inspection_time = ?
+              AND deleted_at IS NOT NULL
+            LIMIT 1
+        ");
+
+        $restore->execute([$t_pid, $subject_code, $inspection_time]);
     }
 
-    $sqlCheck .= " LIMIT 1";
+    /* ==================================================
+       QUICK WIN FORM
+    ================================================== */ elseif ($form_type === 'quickwin') {
 
-    $stmtCheck = $conn->prepare($sqlCheck);
-    $stmtCheck->execute($params);
-    $row = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+        if (!$t_pid || !$supervision_date) {
+            throw new Exception('ข้อมูลไม่ครบ');
+        }
 
-    if (!$row) {
-        $_SESSION['flash_error'] = 'ไม่พบข้อมูลในถังขยะ หรือไม่มีสิทธิ์กู้คืน';
-        header('Location: index.php');
-        exit;
-    }
+        $sqlCheck = "
+            SELECT p_id
+            FROM quick_win
+            WHERE t_pid = ?
+              AND supervision_date = ?
+              AND deleted_at IS NOT NULL
+        ";
 
-    $targetSupervisorId = $row['supervisor_p_id'];
+        $params = [$t_pid, $supervision_date];
 
-    /* =========================
-       2) กู้คืน (set deleted_at = NULL)
-    ========================= */
-    $stmt = $conn->prepare("
-        UPDATE supervision_sessions
-        SET deleted_at = NULL
-        WHERE supervisor_p_id = ?
-          AND teacher_t_pid = ?
-          AND subject_code = ?
-          AND inspection_time = ?
-          AND deleted_at IS NOT NULL
-        LIMIT 1
-    ");
+        if (!$isAdmin) {
+            $sqlCheck .= " AND p_id = ? ";
+            $params[] = $supervisor_id;
+        }
 
-    $stmt->execute([
-        $targetSupervisorId,
-        $teacher_t_pid,
-        $subject_code,
-        $inspection_time
-    ]);
+        $sqlCheck .= " LIMIT 1";
 
-    if ($stmt->rowCount() === 0) {
-        $_SESSION['flash_error'] = 'กู้คืนไม่สำเร็จ';
+        $stmt = $conn->prepare($sqlCheck);
+        $stmt->execute($params);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$row) {
+            throw new Exception('ไม่พบข้อมูล Quick Win ในถังขยะ หรือไม่มีสิทธิ์');
+        }
+
+        $restore = $conn->prepare("
+            UPDATE quick_win
+            SET deleted_at = NULL
+            WHERE t_pid = ?
+              AND supervision_date = ?
+              AND deleted_at IS NOT NULL
+            LIMIT 1
+        ");
+
+        $restore->execute([$t_pid, $supervision_date]);
     } else {
-        $_SESSION['flash_success'] = '♻️ กู้คืนข้อมูลเรียบร้อยแล้ว';
+        throw new Exception('ประเภทแบบฟอร์มไม่ถูกต้อง');
     }
 
+    $_SESSION['flash_success'] = '♻️ กู้คืนข้อมูลเรียบร้อยแล้ว';
     header('Location: index.php');
     exit;
 } catch (Exception $e) {
-    $_SESSION['flash_error'] = 'เกิดข้อผิดพลาด: ' . $e->getMessage();
+
+    $_SESSION['flash_error'] = $e->getMessage();
     header('Location: index.php');
     exit;
 }

@@ -14,20 +14,26 @@ if (!$id) {
     exit('Invalid ID');
 }
 
-/* ===== Load image ===== */
+/* ===== Load image (FROM images table) ===== */
 $stmt = $conn->prepare("
     SELECT file_name 
-    FROM inspection_images 
+    FROM images 
     WHERE id = ?
 ");
 $stmt->execute([$id]);
 $file = $stmt->fetchColumn();
 
 if ($file) {
-    @unlink(__DIR__ . '/../uploads/quickwin/' . $file);
 
+    // ลบไฟล์จริง
+    $path = __DIR__ . '/../uploads/quickwin/' . $file;
+    if (is_file($path)) {
+        unlink($path);
+    }
+
+    // ลบ record
     $del = $conn->prepare("
-        DELETE FROM inspection_images 
+        DELETE FROM images
         WHERE id = ?
     ");
     $del->execute([$id]);

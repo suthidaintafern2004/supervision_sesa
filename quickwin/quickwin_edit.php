@@ -10,6 +10,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+
 require_once __DIR__ . '/../config/db_connect.php';
 
 /* =========================
@@ -97,6 +98,29 @@ $data = $stmt->fetch(PDO::FETCH_ASSOC);
 if (!$data) {
     exit('<div class="alert alert-warning text-center">ไม่พบข้อมูล Quick Win</div>');
 }
+
+/* =========================
+   CALCULATE ACADEMIC YEAR
+========================= */
+$currentYear = (int)date('Y');
+$currentMonth = (int)date('n');
+
+// คำนวณปีการศึกษาปัจจุบัน (พ.ศ.)
+if ($currentMonth >= 5) {
+    $academicYear = $currentYear + 543;
+} else {
+    $academicYear = ($currentYear - 1) + 543;
+}
+
+// 3 ตัวเลือก
+$academicYears = [
+    $academicYear - 1,
+    $academicYear,
+    $academicYear + 1
+];
+
+// กรณี edit: ถ้ามีปีการศึกษาที่เคยบันทึกไว้
+$savedAcademicYear = $data['academic_year'] ?? $academicYear;
 
 /* =========================
    PARSE SAVED OPTIONS
@@ -252,7 +276,21 @@ $images = $stmtImg->fetchAll(PDO::FETCH_ASSOC);
                                         <small class="text-muted">วันที่บันทึก</small>
                                         <div><?= date('d/m/Y H:i', strtotime($data['supervision_date'])) ?></div>
                                     </div>
+
+                                    <div class="col-md-6">
+                                        <label class="text-muted">ปีการศึกษา</label>
+                                        <select name="academic_year" class="form-select" required>
+                                            <?php foreach ($academicYears as $year): ?>
+                                                <option value="<?= $year ?>"
+                                                    <?= ($year == $savedAcademicYear) ? 'selected' : '' ?>>
+                                                    <?= $year ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+
                                 </div>
+
                             </div>
 
                             <!-- KEY เดิม (สำหรับ WHERE ตอน UPDATE) -->
@@ -511,7 +549,7 @@ $images = $stmtImg->fetchAll(PDO::FETCH_ASSOC);
                 confirmButtonColor: '#dc3545'
             }).then(result => {
                 if (result.isConfirmed) {
-                    fetch('delete_quickwin_image.php', {
+                    fetch('quickwin_image_delete.php', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/x-www-form-urlencoded'

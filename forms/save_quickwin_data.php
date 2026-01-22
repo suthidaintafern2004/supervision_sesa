@@ -18,6 +18,11 @@ if (file_exists('../config/db_connect.php')) {
 }
 
 /* =========================
+   FORM TYPE (ใช้ระบุประเภทรูป)
+========================= */
+$formType = 'qw';
+
+/* =========================
    โฟลเดอร์อัปโหลดรูป
 ========================= */
 $uploadDir = __DIR__ . '/../uploads/quickwin/';
@@ -72,6 +77,7 @@ $p_id         = trim($_POST['supervisor_p_id'] ?? '');
 $t_id         = trim($_POST['teacher_t_pid'] ?? '');
 $option_ids   = $_POST['option_ids'] ?? [];
 $option_other = trim($_POST['option_other'] ?? '');
+$academic_year_post = (int)($_POST['academic_year'] ?? 0);
 
 $supervision_date = date('Y-m-d H:i:s');
 
@@ -81,6 +87,7 @@ $supervision_date = date('Y-m-d H:i:s');
 if (
     $p_id === '' ||
     $t_id === '' ||
+    $academic_year_post === 0 ||
     (empty($option_ids) && $option_other === '')
 ) {
     redirect_with_flash_message(
@@ -93,7 +100,10 @@ if (
 /* =========================
    คำนวณปีการศึกษา
 ========================= */
-$academic_year = getAcademicYear($supervision_date);
+// ใช้ค่าจากฟอร์มเป็นหลัก (fallback กรณีผิดปกติ)
+$academic_year = ($academic_year_post > 2500)
+    ? $academic_year_post
+    : getAcademicYear($supervision_date);
 
 /* =========================
    ตรวจสอบ Quick Win ซ้ำ
@@ -179,17 +189,35 @@ try {
 
                 $imgSql = "
                     INSERT INTO images
-                        (supervisor_p_id, teacher_t_pid, subject_code, inspection_time, file_name, academic_year)
+                        (
+                            supervisor_p_id,
+                            teacher_t_pid,
+                            subject_code,
+                            inspection_time,
+                            file_name,
+                            academic_year,
+                            form_type
+                        )
                     VALUES
-                        (:pid, :tid, NULL, NULL, :fname, :ay)
+                        (
+                            :pid,
+                            :tid,
+                            NULL,
+                            NULL,
+                            :fname,
+                            :ay,
+                            :form_type
+                        )
                 ";
+
 
                 $imgStmt = $conn->prepare($imgSql);
                 $imgStmt->execute([
-                    ':pid'   => $p_id,
-                    ':tid'   => $t_id,
-                    ':fname' => $newFileName,
-                    ':ay'    => $academic_year
+                    ':pid'       => $p_id,
+                    ':tid'       => $t_id,
+                    ':fname'     => $newFileName,
+                    ':ay'        => $academic_year,
+                    ':form_type' => $formType
                 ]);
             }
         }
