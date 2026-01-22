@@ -1,60 +1,65 @@
 <?php
-// ไฟล์: session_details.php
+// ===============================
+// session_details.php (PHP ONLY)
+// ===============================
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+
 require_once __DIR__ . '/config/db_connect.php';
 
-// ตรวจสอบสถานะล็อกอิน
+/* ===============================
+   ตรวจสิทธิ์
+=============================== */
 $is_supervisor = isset($_SESSION['is_logged_in']) && $_SESSION['is_logged_in'] === true;
 
-// 1) รับค่า teacher_pid
-$teacher_pid = $_POST['teacher_pid'] ?? $_GET['teacher_pid'] ?? null;
+/* ===============================
+   รับค่า teacher_pid
+=============================== */
+$teacher_pid = $_GET['teacher_pid'] ?? $_POST['teacher_pid'] ?? null;
 
-if ($teacher_pid === null) {
-    die('<div class="alert alert-danger mt-5 text-center">ไม่พบรหัสประจำตัวผู้รับการนิเทศ</div>');
+if (!$teacher_pid) {
+    die('<div class="alert alert-danger mt-5 text-center">ไม่พบรหัสครู</div>');
 }
 
-$results      = [];
 $teacher_info = null;
+$results      = [];
 
 try {
-    /* =========================
-       2) ดึงข้อมูลครู
-    ========================= */
+
+    /* ===============================
+       1) ข้อมูลครู
+    =============================== */
     $sql_teacher = "
-    SELECT 
-        CONCAT(IFNULL(p.prefix_name,''), t.f_name, ' ', t.l_name) AS teacher_full_name,
-        s.school_name AS SchoolName,
-        pos.position_name AS teacher_position,
-        sg.subjectgroup_name
-    FROM teacher t
-    LEFT JOIN prefix p ON t.prefix_id = p.prefix_id
-    LEFT JOIN school s ON t.school_id = s.school_id
-    LEFT JOIN position pos ON t.position_id = pos.position_id
-    LEFT JOIN subject_group sg 
-           ON t.subjectgroup_id = sg.subjectgroup_id
-    WHERE t.t_pid = :pid
-";
+        SELECT 
+            CONCAT(IFNULL(p.prefix_name,''), t.f_name, ' ', t.l_name) AS teacher_full_name,
+            s.school_name AS SchoolName,
+            pos.position_name AS teacher_position,
+            sg.subjectgroup_name
+        FROM teacher t
+        LEFT JOIN prefix p ON t.prefix_id = p.prefix_id
+        LEFT JOIN school s ON t.school_id = s.school_id
+        LEFT JOIN position pos ON t.position_id = pos.position_id
+        LEFT JOIN subject_group sg ON t.subjectgroup_id = sg.subjectgroup_id
+        WHERE t.t_pid = :pid
+    ";
 
-
-    $stmt_teacher = $conn->prepare($sql_teacher);
-    $stmt_teacher->execute([':pid' => $teacher_pid]);
-    $teacher_info = $stmt_teacher->fetch(PDO::FETCH_ASSOC);
+    $stmt = $conn->prepare($sql_teacher);
+    $stmt->execute([':pid' => $teacher_pid]);
+    $teacher_info = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$teacher_info) {
-        die('<div class="alert alert-danger mt-5 text-center">ไม่พบข้อมูลครูในระบบ</div>');
+        die('<div class="alert alert-danger mt-5 text-center">ไม่พบข้อมูลครู</div>');
     }
 
-    $learning_group = $teacher_info['subjectgroup_name'] ?? '-';
-
-
-    /* =========================
-       3) ดึงประวัติการนิเทศ
-    ========================= */
+    /* ===============================
+       2) ประวัติการนิเทศ (Normal + Quick Win)
+    =============================== */
     $sql_history = "
         SELECT * FROM (
-            /* ---------- นิเทศปกติ ---------- */
+
+            /* ===== NORMAL ===== */
             SELECT 
                 ss.supervisor_p_id,
                 ss.teacher_t_pid,
@@ -66,9 +71,8 @@ try {
                 ss.subject_name AS topic,
                 CONCAT(IFNULL(p.prefix_name,''), s.fname, ' ', s.lname) AS supervisor_full_name,
 
-                /* ⭐️ ตรวจว่ามี KPI แล้วหรือยัง */
                 (
-                    SELECT COUNT(*) 
+                    SELECT COUNT(*)
                     FROM kpi_answers ka
                     WHERE ka.supervisor_p_id = ss.supervisor_p_id
                       AND ka.teacher_t_pid   = ss.teacher_t_pid
@@ -76,11 +80,13 @@ try {
                       AND ka.inspection_time = ss.inspection_time
                 ) AS kpi_count,
 
+                /* status: ประเมินแล้วหรือยัง */
                 (CASE WHEN EXISTS (
-                    SELECT 1 FROM satisfaction_answers sa 
-                    WHERE sa.supervisor_p_id = ss.supervisor_p_id 
-                      AND sa.teacher_t_pid   = ss.teacher_t_pid 
-                      AND sa.subject_code    = ss.subject_code 
+                    SELECT 1
+                    FROM satisfaction_answers sa
+                    WHERE sa.supervisor_p_id = ss.supervisor_p_id
+                      AND sa.teacher_t_pid   = ss.teacher_t_pid
+                      AND sa.subject_code    = ss.subject_code
                       AND sa.inspection_time = ss.inspection_time
                 ) THEN 1 ELSE 0 END) AS status,
 
@@ -92,12 +98,12 @@ try {
             LEFT JOIN supervisor s ON ss.supervisor_p_id = s.p_id
             LEFT JOIN prefix p ON s.prefix_id = p.prefix_id
             WHERE ss.teacher_t_pid = :pid1
-                AND ss.deleted_at IS NULL
+              AND ss.deleted_at IS NULL
 
             UNION ALL
 
-            /* ---------- Quick Win ---------- */
-            SELECT 
+            /* ===== QUICK WIN ===== */
+            SELECT
                 NULL AS supervisor_p_id,
                 qw.t_pid AS teacher_t_pid,
                 NULL AS subject_code,
@@ -109,16 +115,11 @@ try {
                 CONCAT(IFNULL(p.prefix_name,''), s.fname, ' ', s.lname) AS supervisor_full_name,
                 0 AS kpi_count,
 
-                (CASE WHEN EXISTS (
-                    SELECT 1 
-                    FROM quickwin_satisfaction_answers qsa
-                    WHERE qsa.t_pid            = qw.t_pid 
-                      AND qsa.p_id             = qw.p_id
-                      AND qsa.supervision_date = qw.supervision_date
-                ) THEN 1 ELSE 0 END) AS status,
+                /* ⭐ ใช้ flag จาก quick_win โดยตรง */
+                qw.satisfaction_submitted AS status,
 
-                qw.t_pid            AS qw_t_id,
-                qw.p_id             AS qw_p_id,
+                qw.t_pid AS qw_t_id,
+                qw.p_id  AS qw_p_id,
                 qw.supervision_date AS qw_date
 
             FROM quick_win qw
@@ -126,19 +127,26 @@ try {
             LEFT JOIN prefix p ON s.prefix_id = p.prefix_id
             LEFT JOIN quickwin_options qo ON qw.options = qo.OptionID
             WHERE qw.t_pid = :pid2
+              AND qw.deleted_at IS NULL
+
         ) AS history
         ORDER BY supervision_date DESC
     ";
 
     $stmt = $conn->prepare($sql_history);
-    $stmt->execute([':pid1' => $teacher_pid, ':pid2' => $teacher_pid]);
+    $stmt->execute([
+        ':pid1' => $teacher_pid,
+        ':pid2' => $teacher_pid
+    ]);
+
     $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
     die('<div class="alert alert-danger mt-5 text-center">
-        เกิดข้อผิดพลาดในการดึงข้อมูล: ' . $e->getMessage() . '
+        เกิดข้อผิดพลาด: ' . htmlspecialchars($e->getMessage()) . '
     </div>');
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="th">
 

@@ -1,8 +1,7 @@
 <?php
-
 /*************************************************
  * save_satisfaction.php
- * FINAL – Normal + Quickwin (Safe / Production)
+ * FINAL – Normal + Quickwin + Academic Year
  *************************************************/
 
 error_reporting(E_ALL);
@@ -13,6 +12,16 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 require_once '../config/db_connect.php';
+
+/* ===============================
+   function: คำนวณปีการศึกษา
+=============================== */
+function getAcademicYearFromDate(string $date): int
+{
+    $y = (int)date('Y', strtotime($date));
+    $m = (int)date('n', strtotime($date));
+    return ($m >= 5) ? $y + 543 : $y + 542;
+}
 
 /* ===============================
    ตรวจ method
@@ -42,11 +51,10 @@ $conn->beginTransaction();
 try {
 
     /* ==================================================
-       MODE : NORMAL (ชั้นเรียน)
+       MODE : NORMAL
     ================================================== */
     if ($mode === 'normal') {
 
-        // 👉 ใช้ POST เท่านั้น (ไม่พึ่ง session)
         $c = [
             's_pid'    => $_POST['s_pid'] ?? null,
             't_pid'    => $_POST['t_pid'] ?? null,
@@ -60,32 +68,37 @@ try {
             }
         }
 
-        /* === กันบันทึกซ้ำ === */
-        $chk = $conn->prepare("
-            SELECT 1
-            FROM satisfaction_answers
+        /* === ดึง supervision_date === */
+        $stmt = $conn->prepare("
+            SELECT supervision_date
+            FROM supervision_sessions
             WHERE supervisor_p_id = ?
               AND teacher_t_pid   = ?
               AND subject_code    = ?
               AND inspection_time = ?
+              AND deleted_at IS NULL
             LIMIT 1
         ");
-        $chk->execute([
+        $stmt->execute([
             $c['s_pid'],
             $c['t_pid'],
             $c['sub_code'],
             $c['time']
         ]);
 
-        if ($chk->fetch()) {
-            throw new Exception('ท่านได้ทำการประเมินชั้นเรียนนี้ไปแล้ว');
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            throw new Exception('ไม่พบข้อมูลการนิเทศ');
         }
 
-        /* === บันทึกคะแนน === */
+        $academic_year = getAcademicYearFromDate($row['supervision_date']);
+
+        /* === INSERT คะแนน (ใส่ academic_year) === */
         $stmt = $conn->prepare("
             INSERT INTO satisfaction_answers
-            (supervisor_p_id, teacher_t_pid, subject_code, inspection_time, question_id, rating)
-            VALUES (?, ?, ?, ?, ?, ?)
+            (supervisor_p_id, teacher_t_pid, subject_code, inspection_time,
+             question_id, rating, academic_year)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         ");
 
         foreach ($ratings as $qid => $score) {
@@ -95,29 +108,29 @@ try {
                 $c['sub_code'],
                 $c['time'],
                 $qid,
-                $score
+                $score,
+                $academic_year
             ]);
         }
 
-        /* === บันทึกข้อเสนอแนะ === */
-        if ($suggestion !== '') {
-            $stmt = $conn->prepare("
-        UPDATE supervision_sessions
-        SET satisfaction_suggestion = ?
-        WHERE supervisor_p_id = ?
-          AND teacher_t_pid   = ?
-          AND subject_code    = ?
-          AND inspection_time = ?
-          AND deleted_at IS NULL
-    ");
-            $stmt->execute([
-                $suggestion,
-                $c['s_pid'],
-                $c['t_pid'],
-                $c['sub_code'],
-                $c['time']
-            ]);
-        }
+        /* === update supervision_sessions === */
+        $stmt = $conn->prepare("
+            UPDATE supervision_sessions
+            SET satisfaction_submitted = 1,
+                satisfaction_date = NOW(),
+                academic_year = ?
+            WHERE supervisor_p_id = ?
+              AND teacher_t_pid   = ?
+              AND subject_code    = ?
+              AND inspection_time = ?
+        ");
+        $stmt->execute([
+            $academic_year,
+            $c['s_pid'],
+            $c['t_pid'],
+            $c['sub_code'],
+            $c['time']
+        ]);
     }
 
     /* ==================================================
@@ -126,41 +139,19 @@ try {
     if ($mode === 'quickwin') {
 
         if (!isset($_SESSION['quickwin_context'])) {
-            throw new Exception('quickwin_context ไม่พบใน session');
+            throw new Exception('quickwin_context ไม่พบ');
         }
 
         $c = $_SESSION['quickwin_context'];
 
-        foreach (['t_pid', 'p_id', 'date'] as $k) {
-            if (empty($c[$k])) {
-                throw new Exception("quickwin_context ไม่ครบ: {$k}");
-            }
-        }
+        /* === คำนวณปีการศึกษา === */
+        $academic_year = getAcademicYearFromDate($c['date']);
 
-        /* === กันบันทึกซ้ำ === */
-        $chk = $conn->prepare("
-            SELECT 1
-            FROM quickwin_satisfaction_answers
-            WHERE t_pid = ?
-              AND p_id  = ?
-              AND supervision_date = ?
-            LIMIT 1
-        ");
-        $chk->execute([
-            $c['t_pid'],
-            $c['p_id'],
-            $c['date']
-        ]);
-
-        if ($chk->fetch()) {
-            throw new Exception('ท่านได้ทำการประเมิน Quick Win นี้ไปแล้ว');
-        }
-
-        /* === บันทึกคะแนน === */
+        /* === INSERT คะแนน (ใส่ academic_year) === */
         $stmt = $conn->prepare("
             INSERT INTO quickwin_satisfaction_answers
-            (t_pid, p_id, supervision_date, question_id, rating)
-            VALUES (?, ?, ?, ?, ?)
+            (t_pid, p_id, supervision_date, question_id, rating, academic_year)
+            VALUES (?, ?, ?, ?, ?, ?)
         ");
 
         foreach ($ratings as $qid => $score) {
@@ -169,47 +160,36 @@ try {
                 $c['p_id'],
                 $c['date'],
                 $qid,
-                $score
+                $score,
+                $academic_year
             ]);
         }
 
-        /* === บันทึกข้อเสนอแนะ === */
-        if ($suggestion !== '') {
-            $stmt = $conn->prepare("
-        UPDATE quick_win
-        SET satisfaction_suggestion = ?
-        WHERE t_pid = ?
-          AND p_id  = ?
-          AND supervision_date = ?
-    ");
-            $stmt->execute([
-                $suggestion,
-                $c['t_pid'],
-                $c['p_id'],
-                $c['date']
-            ]);
-        }
+        /* === update quick_win === */
+        $stmt = $conn->prepare("
+            UPDATE quick_win
+            SET satisfaction_submitted = 1,
+                satisfaction_date = NOW(),
+                academic_year = ?
+            WHERE t_pid = ?
+              AND p_id  = ?
+              AND supervision_date = ?
+        ");
+        $stmt->execute([
+            $academic_year,
+            $c['t_pid'],
+            $c['p_id'],
+            $c['date']
+        ]);
     }
 
-    /* ===============================
-       COMMIT
-    =============================== */
     $conn->commit();
 
-    // ===== redirect หลังบันทึกสำเร็จ =====
-    $teacher_pid = $c['t_pid'] ?? null;
-
-    header(
-        'Location: ../session_details.php?teacher_pid=' . urlencode($teacher_pid) . '&success=1'
-    );
+    header('Location: ../session_details.php?teacher_pid=' . urlencode($c['t_pid']) . '&success=1');
     exit;
+
 } catch (Exception $e) {
     $conn->rollBack();
-    error_log("Save Satisfaction Error: " . $e->getMessage());
-
-    $_SESSION['flash_message'] = $e->getMessage();
-    $_SESSION['flash_type']    = 'warning';
-
-    header('Location: ../session_details.php?teacher_pid=' . urlencode($c['t_pid'] ?? ''));
-    exit;
+    error_log($e->getMessage());
+    exit($e->getMessage());
 }
