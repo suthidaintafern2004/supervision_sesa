@@ -2,8 +2,12 @@
 session_start();
 require_once '../config/db_connect.php';
 
+header('Content-Type: application/json; charset=utf-8');
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    exit('Invalid request');
+    http_response_code(405);
+    echo json_encode(['status' => 'error', 'message' => 'Invalid request']);
+    exit;
 }
 
 $t_pid  = $_POST['t_pid'] ?? null;
@@ -11,7 +15,9 @@ $p_id   = $_POST['p_id'] ?? null;
 $date   = $_POST['supervision_date'] ?? null;
 
 if (!$t_pid || !$p_id || !$date) {
-    exit('ข้อมูลไม่ครบ');
+    http_response_code(400);
+    echo json_encode(['status' => 'error', 'message' => 'ข้อมูลไม่ครบ']);
+    exit;
 }
 
 $stmt = $conn->prepare("
@@ -21,11 +27,17 @@ $stmt = $conn->prepare("
       AND p_id = ?
       AND supervision_date = ?
       AND deleted_at IS NULL
-    LIMIT 1
 ");
 
 $stmt->execute([$t_pid, $p_id, $date]);
 
-/* 👉 ไปหน้าถังขยะ */
-header('Location: ../trash/index.php?type=quickwin');
+if ($stmt->rowCount() === 0) {
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'ไม่พบข้อมูล หรือข้อมูลถูกลบไปแล้ว'
+    ]);
+    exit;
+}
+
+echo json_encode(['status' => 'success']);
 exit;

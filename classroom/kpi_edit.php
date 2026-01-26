@@ -3,6 +3,10 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+$isAdmin = ($_SESSION['role'] ?? '') === 'admin';
+$supervisor_id = $_SESSION['user_id'] ?? null;
+
+
 // ===============================
 // คำนวณปีการศึกษา (เหมือนตอนบันทึกครั้งแรก)
 // ===============================
@@ -20,20 +24,22 @@ $academicYearOptions = [
     $currentAcademicYear + 1  // ปีหน้า
 ];
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['kpi_ref'])) {
+    $_SESSION['kpi_edit_ref'] = $_POST['kpi_ref'];
+}
+
+if (empty($_SESSION['kpi_edit_ref'])) {
+    header('Location: ../index.php');
+    exit;
+}
+
 require_once '../config/db_connect.php';
 
-/* ===============================
-   รับค่าจาก URL
-================================ */
-$supervisor_id   = $_SESSION['user_id'] ?? '';
-$t_pid           = $_GET['t_pid'] ?? '';
-$subject_code    = $_GET['subject_code'] ?? '';
-$inspection_time = $_GET['inspection_time'] ?? '';
-$isAdmin         = ($_SESSION['role'] ?? '') === 'admin';
+$ref = $_SESSION['kpi_edit_ref'];
 
-if (!$t_pid || !$subject_code || !$inspection_time) {
-    die('<div class="alert alert-danger text-center">ข้อมูลไม่ครบถ้วน</div>');
-}
+$t_pid           = $ref['t_pid'];
+$subject_code    = $ref['subject_code'];
+$inspection_time = $ref['inspection_time'];
 
 /* ===============================
    ดึงข้อมูล session + ครู + ศน.

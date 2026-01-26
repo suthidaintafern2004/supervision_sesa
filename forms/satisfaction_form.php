@@ -12,6 +12,13 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+function getAcademicYearFromDate(string $date): int
+{
+    $y = (int)date('Y', strtotime($date));
+    $m = (int)date('n', strtotime($date));
+    return ($m >= 5) ? $y + 543 : $y + 542;
+}
+
 require_once __DIR__ . '/../config/db_connect.php';
 
 /* ==================================================
@@ -135,10 +142,11 @@ if ($mode === 'quickwin') {
             CONCAT(p.prefix_name, s.fname,' ',s.lname) AS supervisor_full_name,
             CONCAT(pt.prefix_name, t.f_name,' ',t.l_name) AS teacher_full_name,
             CASE WHEN EXISTS (
-                SELECT 1 FROM quickwin_satisfaction_answers qsa
+                SELECT 1
+                FROM quickwin_satisfaction_answers qsa
                 WHERE qsa.t_pid = qw.t_pid
-                  AND qsa.p_id  = qw.p_id
-                  AND qsa.supervision_date = qw.supervision_date
+                AND qsa.p_id  = qw.p_id
+                AND qsa.academic_year = qw.academic_year
             ) THEN 1 ELSE 0 END AS status
         FROM quick_win qw
         JOIN supervisor s ON qw.p_id = s.p_id
@@ -149,6 +157,7 @@ if ($mode === 'quickwin') {
         WHERE qw.t_pid = ?
           AND qw.p_id  = ?
           AND qw.supervision_date = ?
+          AND qw.academic_year = ?
         LIMIT 1
     ";
 
@@ -156,7 +165,8 @@ if ($mode === 'quickwin') {
     $stmt->execute([
         $data['t_pid'],
         $data['p_id'],
-        $data['date']
+        $data['date'],
+        getAcademicYearFromDate($data['date'])
     ]);
 
     $session_info = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -333,6 +343,57 @@ $questions = $q->fetchAll(PDO::FETCH_ASSOC);
             background: #fff5f5;
         }
 
+        /* สีพื้นฐาน */
+        .rating-group label {
+            background: #fafafa;
+            color: #333;
+        }
+
+        /* คะแนน 1 */
+        .rating-group input:checked+label[data-score="1"] {
+            background: #ea4335;
+            /* แดง */
+            border-color: #ea4335;
+            color: #fff;
+        }
+
+        /* คะแนน 2 */
+        .rating-group input:checked+label[data-score="2"] {
+            background: #fbbc04;
+            /* ส้ม */
+            border-color: #fbbc04;
+            color: #000;
+        }
+
+        /* คะแนน 3 */
+        .rating-group input:checked+label[data-score="3"] {
+            background: #fdd663;
+            /* เหลือง */
+            border-color: #fdd663;
+            color: #000;
+        }
+
+        /* คะแนน 4 */
+        .rating-group input:checked+label[data-score="4"] {
+            background: #34a853;
+            /* เขียวอ่อน */
+            border-color: #34a853;
+            color: #fff;
+        }
+
+        /* คะแนน 5 */
+        .rating-group input:checked+label[data-score="5"] {
+            background: #1a73e8;
+            /* น้ำเงิน */
+            border-color: #1a73e8;
+            color: #fff;
+        }
+
+        .rating-group label:hover {
+            transform: scale(1.15);
+            border-color: #1a73e8;
+        }
+
         @media (max-width: 576px) {
             .d-flex.justify-content-between {
                 flex-direction: column-reverse;
@@ -421,7 +482,9 @@ $questions = $q->fetchAll(PDO::FETCH_ASSOC);
                                             id="q<?= $q['id'] ?>_<?= $i ?>"
                                             name="ratings[<?= $q['id'] ?>]"
                                             value="<?= $i ?>">
-                                        <label for="q<?= $q['id'] ?>_<?= $i ?>">
+                                        <label
+                                            for="q<?= $q['id'] ?>_<?= $i ?>"
+                                            data-score="<?= $i ?>">
                                             <?= $i ?>
                                         </label>
                                     <?php endfor; ?>

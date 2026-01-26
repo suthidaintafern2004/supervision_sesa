@@ -61,6 +61,22 @@ try {
     }
 
     // ========================
+    // เตรียมข้อมูลหัวรายงาน
+    // ========================
+    $academic_year = $info['academic_year'] ?? '';
+    $semester      = $info['semester'] ?? '';
+
+    // แปลงตัวเลขเป็นเลขไทย (ถ้าคุณต้องการแบบทางราชการ)
+    function thaiNumber($number)
+    {
+        $thai = ['๐', '๑', '๒', '๓', '๔', '๕', '๖', '๗', '๘', '๙'];
+        return str_replace(range(0, 9), $thai, $number);
+    }
+
+    $academic_year_th = thaiNumber($academic_year);
+    $semester_th      = thaiNumber($semester);
+
+    // ========================
     // 2. ดึงชื่อหัวข้อ Option จากที่บันทึกไว้แบบ 1/6/9
     // ========================
     $selected_topics = [];
@@ -126,7 +142,11 @@ $images = $stmt_imgs->fetchAll(PDO::FETCH_COLUMN);
 
             <div class="text-center mb-5" style="margin-bottom: 25px !important;">
                 <img src="images/logo.png" alt="โลโก้กระทรวงศึกษาธิการ" style="max-width: 80px; margin-bottom: 10px;">
-                <p style="margin-bottom: 0; font-weight: bold; font-size: 0.95rem;">รายงานผลการประเมินจุดเน้น (Quick Win) ภาคเรียนที่ ๒ ปีการศึกษา ๒๕๖๘</p>
+                <p style="margin-bottom: 0; font-weight: bold; font-size: 0.95rem;">
+                    รายงานผลการประเมินจุดเน้น (Quick Win)
+                    ภาคเรียนที่ <?php echo $semester_th; ?>
+                    ปีการศึกษา <?php echo $academic_year_th; ?>
+                </p>
                 <p style="margin-bottom: 0; font-weight: bold; font-size: 0.9rem;">สำนักงานเขตพื้นที่การศึกษามัธยมศึกษาลำปาง ลำพูน</p>
             </div>
 

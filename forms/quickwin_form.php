@@ -11,6 +11,22 @@ if (file_exists('../config/db_connect.php')) {
     require_once 'config/db_connect.php';
 }
 
+/*
+|--------------------------------------------------------------------------
+| FIX: ล้าง flash ถ้าไม่ได้มาจากการบันทึก
+|--------------------------------------------------------------------------
+*/
+if (
+    isset($_SESSION['flash_message'], $_SESSION['flash_from']) &&
+    $_SESSION['flash_from'] !== 'quickwin_save'
+) {
+    unset(
+        $_SESSION['flash_message'],
+        $_SESSION['flash_type'],
+        $_SESSION['flash_from']
+    );
+}
+
 // 2. ตรวจสอบข้อมูลใน Session
 $inspection_data = $_SESSION['inspection_data'] ?? null;
 $form_type = $inspection_data['form_type'] ?? $inspection_data['evaluation_type'] ?? '';
@@ -50,6 +66,23 @@ $academicYears = [
     $currentAcademicYear - 1,
     $currentAcademicYear,
     $currentAcademicYear + 1
+];
+
+
+/* =========================
+   CALCULATE SEMESTER
+========================= */
+// กำหนดภาคเรียนอัตโนมัติ (คร่าว ๆ)
+if ($currentMonth >= 5 && $currentMonth <= 10) {
+    $currentSemester = 1;
+} else {
+    $currentSemester = 2;
+}
+
+// ตัวเลือกภาคเรียน
+$semesters = [
+    1 => 'ภาคเรียนที่ 1',
+    2 => 'ภาคเรียนที่ 2'
 ];
 
 
@@ -105,50 +138,62 @@ $col2_options = array_slice($options, $half);
                         </h4>
                     </div>
 
-                <form action="save_quickwin_data.php" method="POST" id="quickwinForm" enctype="multipart/form-data">
-                
-                    <div class="card-body p-4 p-md-5">
+                    <form action="save_quickwin_data.php" method="POST" id="quickwinForm" enctype="multipart/form-data">
 
-                        <div class="alert alert-light border border-secondary border-opacity-25 rounded-3 mb-4">
-                            <h5 class="text-primary fw-bold mb-3 border-bottom pb-2">
-                                <i class="fas fa-id-card"></i> ข้อมูลการนิเทศ
-                            </h5>
-                            <div class="row g-3">
+                        <div class="card-body p-4 p-md-5">
 
-                                <div class="col-md-6">
-                                    <small class="text-muted d-block">ผู้นิเทศ</small>
-                                    <span class="fs-5 fw-bold text-dark"><?php echo htmlspecialchars($supervisor_name); ?></span>
+                            <div class="alert alert-light border border-secondary border-opacity-25 rounded-3 mb-4">
+                                <h5 class="text-primary fw-bold mb-3 border-bottom pb-2">
+                                    <i class="fas fa-id-card"></i> ข้อมูลการนิเทศ
+                                </h5>
+                                <div class="row g-3">
+
+                                    <div class="col-md-6">
+                                        <small class="text-muted d-block">ผู้นิเทศ</small>
+                                        <span class="fs-5 fw-bold text-dark"><?php echo htmlspecialchars($supervisor_name); ?></span>
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <small class="text-muted d-block">ผู้รับการนิเทศ</small>
+                                        <span class="fs-5 fw-bold text-dark"><?php echo htmlspecialchars($teacher_name); ?></span>
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <small class="text-muted d-block">โรงเรียน</small>
+                                        <span><?php echo htmlspecialchars($school_name); ?></span>
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <small class="text-muted d-block">กลุ่มสาระฯ/วิชา</small>
+                                        <span><?php echo htmlspecialchars($subject_name); ?></span>
+                                    </div>
+
+                                    <div class="col-md-3">
+                                        <small class="text-muted d-block">ภาคเรียน</small>
+                                        <select name="semester" class="form-select mt-1" required>
+                                            <?php foreach ($semesters as $key => $label): ?>
+                                                <option value="<?= $key ?>"
+                                                    <?= ($key == $currentSemester) ? 'selected' : '' ?>>
+                                                    <?= $label ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+
+                                    <div class="col-md-3">
+                                        <small class="text-muted d-block">ปีการศึกษา</small>
+                                        <select name="academic_year" class="form-select mt-1" required>
+                                            <?php foreach ($academicYears as $year): ?>
+                                                <option value="<?= $year ?>"
+                                                    <?= ($year == $currentAcademicYear) ? 'selected' : '' ?>>
+                                                    <?= $year ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+
                                 </div>
-
-                                <div class="col-md-6">
-                                    <small class="text-muted d-block">ผู้รับการนิเทศ</small>
-                                    <span class="fs-5 fw-bold text-dark"><?php echo htmlspecialchars($teacher_name); ?></span>
-                                </div>
-
-                                <div class="col-md-6">
-                                    <small class="text-muted d-block">โรงเรียน</small>
-                                    <span><?php echo htmlspecialchars($school_name); ?></span>
-                                </div>
-
-                                <div class="col-md-6">
-                                    <small class="text-muted d-block">กลุ่มสาระฯ/วิชา</small>
-                                    <span><?php echo htmlspecialchars($subject_name); ?></span>
-                                </div>
-
-                                <div class="col-md-6">
-                                    <small class="text-muted d-block">ปีการศึกษา</small>
-                                    <select name="academic_year" class="form-select mt-1" required>
-                                        <?php foreach ($academicYears as $year): ?>
-                                            <option value="<?= $year ?>"
-                                                <?= ($year == $currentAcademicYear) ? 'selected' : '' ?>>
-                                                <?= $year ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                </div>
-
                             </div>
-                        </div>
 
                             <input type="hidden" name="supervisor_p_id" value="<?php echo htmlspecialchars($supervisor_pid); ?>">
                             <input type="hidden" name="teacher_t_pid" value="<?php echo htmlspecialchars($teacher_pid); ?>">
@@ -247,12 +292,12 @@ $col2_options = array_slice($options, $half);
                                     </div>
                                 </div>
 
-                        </form>
+                    </form>
 
-                    </div>
                 </div>
             </div>
         </div>
+    </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
@@ -349,21 +394,22 @@ $col2_options = array_slice($options, $half);
 
     </script>
 
-    <?php if (isset($_SESSION['flash_message'])): ?>
+    <?php if (!empty($_SESSION['flash_once'])): ?>
         <script>
             Swal.fire({
-                icon: <?= json_encode($_SESSION['flash_type'] ?? 'info') ?>,
-                title: <?= json_encode(
-                            ($_SESSION['flash_type'] === 'success')
-                                ? 'สำเร็จ'
-                                : 'แจ้งเตือน'
-                        ) ?>,
+                icon: <?= json_encode($_SESSION['flash_type'] ?? 'success') ?>,
+                title: 'สำเร็จ',
                 text: <?= json_encode($_SESSION['flash_message']) ?>,
                 confirmButtonText: 'รับทราบ'
             });
         </script>
     <?php
-        unset($_SESSION['flash_message'], $_SESSION['flash_type']);
+        // 🔥 ล้างทันทีหลังแสดง
+        unset(
+            $_SESSION['flash_once'],
+            $_SESSION['flash_message'],
+            $_SESSION['flash_type']
+        );
     endif;
     ?>
 

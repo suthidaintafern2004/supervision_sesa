@@ -10,6 +10,19 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+/* รับค่าจาก POST ครั้งแรก */
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['qw_ref'])) {
+    $_SESSION['quickwin_edit_ref'] = $_POST['qw_ref'];
+}
+
+/* ถ้าไม่มี session อ้างอิง → ห้ามเข้า */
+if (empty($_SESSION['quickwin_edit_ref'])) {
+    header('Location: ../list_all_forms.php');
+    exit;
+}
+
+$ref = $_SESSION['quickwin_edit_ref'];
+
 
 require_once __DIR__ . '/../config/db_connect.php';
 
@@ -61,15 +74,13 @@ $supervisors = $conn->query("
 ")->fetchAll(PDO::FETCH_ASSOC);
 
 /* =========================
-   COMPOSITE KEY
+   LOAD REF FROM SESSION
 ========================= */
-$t_pid            = $_GET['t_pid'] ?? null;
-$p_id             = $_GET['p_id'] ?? null;
-$supervision_date = $_GET['supervision_date'] ?? null;
+$ref = $_SESSION['quickwin_edit_ref'];
 
-if (!$t_pid || !$p_id || !$supervision_date) {
-    exit('<div class="alert alert-danger text-center">ข้อมูลไม่ครบ</div>');
-}
+$t_pid            = $ref['t_pid'];
+$p_id             = $ref['p_id'];
+$supervision_date = $ref['supervision_date'];
 
 /* =========================
    LOAD QUICK WIN DATA

@@ -18,6 +18,12 @@ $is_supervisor = isset($_SESSION['is_logged_in']) && $_SESSION['is_logged_in'] =
    รับค่า teacher_pid
 =============================== */
 $teacher_pid = $_GET['teacher_pid'] ?? $_POST['teacher_pid'] ?? null;
+$academic_year = $_GET['academic_year'] ?? $_POST['academic_year'] ?? '';
+
+// ⭐ ป้องกันค่าปีการศึกษาที่ไม่ใช่ตัวเลข
+if (!empty($academic_year) && !ctype_digit((string)$academic_year)) {
+    $academic_year = '';
+}
 
 if (!$teacher_pid) {
     die('<div class="alert alert-danger mt-5 text-center">ไม่พบรหัสครู</div>');
@@ -98,36 +104,44 @@ try {
             LEFT JOIN supervisor s ON ss.supervisor_p_id = s.p_id
             LEFT JOIN prefix p ON s.prefix_id = p.prefix_id
             WHERE ss.teacher_t_pid = :pid1
-              AND ss.deleted_at IS NULL
+                AND ss.deleted_at IS NULL
+                AND (:year = '' OR ss.academic_year = :year)
 
             UNION ALL
 
             /* ===== QUICK WIN ===== */
-            SELECT
-                NULL AS supervisor_p_id,
-                qw.t_pid AS teacher_t_pid,
-                NULL AS subject_code,
-                NULL AS inspection_time,
-                'quickwin' AS session_type,
-                qw.supervision_date,
-                '-' AS time_info,
-                qo.OptionText AS topic,
-                CONCAT(IFNULL(p.prefix_name,''), s.fname, ' ', s.lname) AS supervisor_full_name,
-                0 AS kpi_count,
+                SELECT
+                    NULL AS supervisor_p_id,
+                    qw.t_pid AS teacher_t_pid,
+                    NULL AS subject_code,
+                    NULL AS inspection_time,
+                    'quickwin' AS session_type,
+                    qw.supervision_date,
+                    '-' AS time_info,
+                    qo.OptionText AS topic,
+                    CONCAT(IFNULL(p.prefix_name,''), s.fname, ' ', s.lname) AS supervisor_full_name,
+                    0 AS kpi_count,
 
-                /* ⭐ ใช้ flag จาก quick_win โดยตรง */
-                qw.satisfaction_submitted AS status,
+                    /* ✅ ตรวจจากตารางคำตอบจริง */
+                    (CASE WHEN EXISTS (
+                        SELECT 1
+                        FROM quickwin_satisfaction_answers saq
+                        WHERE saq.t_pid = qw.t_pid
+                        AND saq.p_id = qw.p_id
+                        AND saq.supervision_date = qw.supervision_date
+                    ) THEN 1 ELSE 0 END) AS status,
 
-                qw.t_pid AS qw_t_id,
-                qw.p_id  AS qw_p_id,
-                qw.supervision_date AS qw_date
+                    qw.t_pid AS qw_t_id,
+                    qw.p_id  AS qw_p_id,
+                    qw.supervision_date AS qw_date
 
-            FROM quick_win qw
-            LEFT JOIN supervisor s ON qw.p_id = s.p_id
-            LEFT JOIN prefix p ON s.prefix_id = p.prefix_id
-            LEFT JOIN quickwin_options qo ON qw.options = qo.OptionID
-            WHERE qw.t_pid = :pid2
-              AND qw.deleted_at IS NULL
+                FROM quick_win qw
+                LEFT JOIN supervisor s ON qw.p_id = s.p_id
+                LEFT JOIN prefix p ON s.prefix_id = p.prefix_id
+                LEFT JOIN quickwin_options qo ON qw.options = qo.OptionID
+                WHERE qw.t_pid = :pid2
+                AND qw.deleted_at IS NULL
+                AND (:year = '' OR qw.academic_year = :year)
 
         ) AS history
         ORDER BY supervision_date DESC
@@ -136,7 +150,8 @@ try {
     $stmt = $conn->prepare($sql_history);
     $stmt->execute([
         ':pid1' => $teacher_pid,
-        ':pid2' => $teacher_pid
+        ':pid2' => $teacher_pid,
+        ':year' => $academic_year
     ]);
 
     $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -176,6 +191,12 @@ try {
             <h2 class="card-title text-center mb-4">
                 <i class="fas fa-user-clock"></i> รายละเอียดประวัติการนิเทศ
             </h2>
+
+            <?php if (!empty($academic_year)): ?>
+                <div class="alert alert-info text-center fw-bold mb-3">
+                    แสดงข้อมูลปีการศึกษา <?= htmlspecialchars($academic_year) ?>
+                </div>
+            <?php endif; ?>
 
             <div class="card mb-4 border-primary">
                 <div class="card-body bg-light">
@@ -333,7 +354,8 @@ try {
             </div>
 
             <div class="text-center mt-4">
-                <a href="index.php" class="btn btn-danger">
+                <a href="index.php<?= !empty($academic_year) ? '?academic_year=' . urlencode($academic_year) : '' ?>"
+                    class="btn btn-danger">
                     <i class="fas fa-chevron-left"></i> กลับไปหน้าประวัติรวม
                 </a>
             </div>

@@ -42,10 +42,14 @@ $teacher_t_pid   = $_POST['t_pid'] ?? '';
 $subject_code    = trim($_POST['subject_code'] ?? '');
 $subject_name    = trim($_POST['subject_name'] ?? '');
 $inspection_date = $_POST['supervision_date'] ?? date('Y-m-d');
-
 $overall_suggestion    = trim($_POST['overall_suggestion'] ?? '');
 $ratings               = $_POST['ratings'] ?? [];
 $indicator_suggestions = $_POST['indicator_suggestions'] ?? [];
+$inspection_time = (int)($_POST['inspection_time'] ?? 0);
+
+if ($inspection_time < 1 || $inspection_time > 9) {
+    redirect_with_message('กรุณาเลือกครั้งที่นิเทศ', 'summary.php');
+}
 
 // normalize subject_code (ใช้ตรวจซ้ำ)
 $subject_code_db = preg_replace('/\s+/', '', strtolower($subject_code));
@@ -54,6 +58,12 @@ $academic_year = (int)($_POST['academic_year'] ?? 0);
 
 if ($academic_year <= 0) {
     redirect_with_message('กรุณาเลือกปีการศึกษา', 'summary.php');
+}
+
+$semester = (int)($_POST['semester'] ?? 0);
+
+if (!in_array($semester, [1, 2, 3])) {
+    redirect_with_message('กรุณาเลือกภาคเรียน', 'summary.php');
 }
 
 // --------------------------------------------
@@ -72,58 +82,40 @@ if (
 
 try {
     $conn->beginTransaction();
-
     // --------------------------------------------
-    // 2) 🔒 ตรวจซ้ำภายใน 14 วัน
+    // 2) 🔒 ตรวจซ้ำ: ครู + วิชา + ครั้ง + ปีการศึกษา
     // --------------------------------------------
-    $sql14 = "
-        SELECT 1
-        FROM supervision_sessions
-        WHERE teacher_t_pid = ?
-          AND REPLACE(LOWER(subject_code),' ','') = ?
-          AND inspection_date >= DATE_SUB(CURDATE(), INTERVAL 14 DAY)
-          AND academic_year = ?
-        LIMIT 1
-    ";
-    $stmt14 = $conn->prepare($sql14);
-    $stmt14->execute([$teacher_t_pid, $subject_code_db, $academic_year]);
+    $sqlDup = "
+            SELECT 1
+            FROM supervision_sessions
+            WHERE teacher_t_pid = ?
+            AND REPLACE(LOWER(subject_code),' ','') = ?
+            AND inspection_time = ?
+            AND academic_year = ?
+            AND semester = ?
+            LIMIT 1
+        ";
 
-    if ($stmt14->fetch()) {
+    $stmtDup = $conn->prepare($sqlDup);
+    $stmtDup->execute([
+        $teacher_t_pid,
+        $subject_code_db,
+        $inspection_time,
+        $academic_year,
+        $semester
+    ]);
+
+    if ($stmtDup->fetch()) {
         $conn->rollBack();
 
         $_SESSION['flash_error'] = [
             'title' => 'ไม่สามารถบันทึกได้',
-            'text'  => 'ครูคนนี้ได้รับการนิเทศในรายวิชานี้ภายใน 14 วันที่ผ่านมาแล้ว',
+            'text'  => "ครูคนนี้ได้รับการนิเทศ\nวิชานี้ ครั้งที่ {$inspection_time}\nปีการศึกษา {$academic_year} แล้ว",
             'icon'  => 'warning'
         ];
 
         header("Location: summary.php");
         exit;
-    }
-
-    // --------------------------------------------
-    // 3) คำนวณ inspection_time (1–9)
-    // --------------------------------------------
-    $sqlTime = "
-        SELECT MAX(inspection_time)
-        FROM supervision_sessions
-        WHERE teacher_t_pid = ?
-          AND REPLACE(LOWER(subject_code),' ','') = ?
-          AND academic_year = ?
-        FOR UPDATE
-    ";
-    $stmtTime = $conn->prepare($sqlTime);
-    $stmtTime->execute([$teacher_t_pid, $subject_code_db, $academic_year]);
-    $lastTime = (int)$stmtTime->fetchColumn();
-
-    $inspection_time = $lastTime + 1;
-
-    if ($inspection_time > 9) {
-        $conn->rollBack();
-        redirect_with_message(
-            "❌ วิชานี้ถูกนิเทศครบ 9 ครั้งแล้ว",
-            "summary.php"
-        );
     }
 
     // --------------------------------------------
@@ -139,10 +131,11 @@ try {
             inspection_time,
             inspection_date,
             academic_year,
+            semester,
             overall_suggestion,
             supervision_date
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
         ";
 
     $stmtSession = $conn->prepare($sqlSession);
@@ -154,6 +147,7 @@ try {
         $inspection_time,
         $inspection_date,
         $academic_year,
+        $semester,
         $overall_suggestion
     ]);
 

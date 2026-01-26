@@ -93,11 +93,12 @@ foreach ($result as $row) {
   <h4 class="fw-bold text-success">กรอกข้อมูลการนิเทศ</h4>
 
   <div class="alert alert-info py-2">
-    <small><i class="fas fa-info-circle"></i> ท่านสามารถเลือก "ครั้งที่นิเทศ" ซ้ำกับเดิมได้ หากเป็นการนิเทศใน <strong>รหัสวิชาอื่น</strong></small>
+    <small><i class="fas fa-info-circle"></i> ท่านสามารถเลือก "ครั้งที่นิเทศ" ได้อิสระ ระบบจะตรวจสอบความซ้ำซ้อนเมื่อกดบันทึก </small>
   </div>
   <hr class="my-4">
 
   <h4 class="fw-bold text-success">กรอกข้อมูลการนิเทศ</h4>
+
   <div class="row g-3 align-items-end mt-2 mb-4">
 
     <!-- รหัสวิชา -->
@@ -129,8 +130,12 @@ foreach ($result as $row) {
         id="inspection_time"
         class="form-select fw-bold text-center"
         required>
-        <option value="">เลือก</option>
+        <option value="">เลือกครั้งที่นิเทศ</option>
+        <?php for ($i = 1; $i <= 9; $i++): ?>
+          <option value="<?= $i ?>">ครั้งที่ <?= $i ?></option>
+        <?php endfor; ?>
       </select>
+
     </div>
 
     <!-- วันที่นิเทศ -->
@@ -143,8 +148,20 @@ foreach ($result as $row) {
         required>
     </div>
 
+    <!-- ภาคเรียน -->
+    <div class="col-md-1">
+      <label class="form-label fw-bold">ภาคเรียน</label>
+      <select name="semester" id="semester"
+        class="form-select text-center" required>
+        <option value="">เลือก</option>
+        <option value="1">1</option>
+        <option value="2">2</option>
+        <option value="3">ฤดูร้อน</option>
+      </select>
+    </div>
+
     <!-- ปีการศึกษา -->
-    <div class="col-md-3">
+    <div class="col-md-2">
       <label class="form-label fw-bold">ปีการศึกษา</label>
       <select name="academic_year"
         id="academic_year"
@@ -256,83 +273,6 @@ foreach ($result as $row) {
 
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-  function loadInspectionTimes() {
-    const subjectInput = document.getElementById('subject_code');
-    const subjectCode = subjectInput.value.trim();
-    const teacherId = document.getElementById('t_pid').value;
-    const select = document.getElementById('inspection_time');
-
-    // reset dropdown
-    select.innerHTML = '<option value="">กำลังตรวจสอบ...</option>';
-    select.disabled = true;
-
-    if (!subjectCode || !teacherId) {
-      select.innerHTML = '<option value="">กรุณากรอกรหัสวิชา</option>';
-      return;
-    }
-
-    fetch(`forms/get_available_times.php?t_pid=${teacherId}&subject_code=${encodeURIComponent(subjectCode)}`)
-      .then(res => res.json())
-      .then(data => {
-
-        // 🔴 เข้าเงื่อนไข 14 วัน
-        if (data.success === false && data.reason === '14_DAYS') {
-
-          Swal.fire({
-            icon: 'warning',
-            title: 'ไม่สามารถบันทึกได้',
-            text: data.message || 'วิชานี้ถูกนิเทศภายใน 14 วันที่ผ่านมา',
-            confirmButtonText: 'เข้าใจแล้ว'
-          });
-
-          // ✅ ล้างเฉพาะรหัสวิชา + ครั้งที่นิเทศ
-          subjectInput.value = '';
-          select.innerHTML = '<option value="">กรุณากรอกรหัสวิชาใหม่</option>';
-          select.disabled = true;
-
-          // ❌ ห้าม reload
-          return;
-        }
-
-        // ❌ error อื่น ๆ
-        if (!data.success) {
-          select.innerHTML = '<option value="">เกิดข้อผิดพลาด</option>';
-          return;
-        }
-
-        // ❌ ครบ 9 ครั้ง
-        if (!Array.isArray(data.available_times) || data.available_times.length === 0) {
-          select.innerHTML = '<option value="">ครบ 9 ครั้งแล้ว</option>';
-          return;
-        }
-
-        // ✅ ปกติ
-        select.disabled = false;
-        select.innerHTML = '<option value="">เลือกครั้งที่นิเทศ</option>';
-
-        data.available_times.forEach(time => {
-          const intTime = parseInt(time, 10);
-          if (!Number.isInteger(intTime)) return;
-
-          const opt = document.createElement('option');
-          opt.value = intTime;
-          opt.textContent = `ครั้งที่ ${intTime}`;
-          select.appendChild(opt);
-        });
-      })
-      .catch(err => {
-        console.error(err);
-        select.innerHTML = '<option value="">ไม่สามารถโหลดข้อมูล</option>';
-      });
-  }
-
-  // debounce ตอนพิมพ์รหัสวิชา
-  let subjectTimer = null;
-  document.getElementById('subject_code').addEventListener('input', () => {
-    clearTimeout(subjectTimer);
-    subjectTimer = setTimeout(loadInspectionTimes, 500);
-  });
-
   // Validation เดิมของคุณ
   const totalQuestions = <?php echo $total_questions_count; ?>;
   async function validateKpiForm() {

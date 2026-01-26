@@ -57,10 +57,10 @@ function toThaiDate($dateStr)
 /* ===============================
    รับค่าจาก Request
 ================================ */
-$s_pid    = $_REQUEST['s_pid']    ?? null;
-$t_pid    = $_REQUEST['t_pid']    ?? null;
-$sub_code = $_REQUEST['sub_code'] ?? null;
-$time     = $_REQUEST['time']     ?? null;
+$s_pid     = $_REQUEST['s_pid']    ?? null;
+$t_pid     = $_REQUEST['t_pid']    ?? null;
+$sub_code  = $_REQUEST['sub_code'] ?? null;
+$time      = $_REQUEST['time']     ?? null;
 $form_type = $_REQUEST['form_type'] ?? 'classroom';
 
 if (!$s_pid || !$t_pid || !$sub_code || !$time) {
@@ -70,111 +70,67 @@ if (!$s_pid || !$t_pid || !$sub_code || !$time) {
 try {
 
     /* ===============================
-       1. ดึงข้อมูลการนิเทศ (ตัวจริง)
-       ❗ ไม่กรอง academic_year ก่อน
+       1. ดึงข้อมูลการนิเทศ
     ================================ */
-    $sql = "
-    SELECT s.*,
-           CONCAT(IFNULL(p.prefix_name,''), t.f_name, ' ', t.l_name) AS teacher_full_name,
-           sc.school_name AS school_name
-    FROM supervision_sessions s
-    LEFT JOIN teacher t ON s.teacher_t_pid = t.t_pid
-    LEFT JOIN prefix p ON t.prefix_id = p.prefix_id
-    LEFT JOIN school sc ON t.school_id = sc.school_id
-    WHERE s.supervisor_p_id = :sid
-      AND s.teacher_t_pid   = :tid
-      AND s.subject_code    = :scode
-      AND s.inspection_time = :time
-    LIMIT 1
-    ";
-
-    $stmt = $conn->prepare($sql);
-    $stmt->execute([
-        ':sid'   => $s_pid,
-        ':tid'   => $t_pid,
-        ':scode' => $sub_code,
-        ':time'  => $time
-    ]);
-
+    $stmt = $conn->prepare("
+        SELECT s.*,
+               CONCAT(IFNULL(p.prefix_name,''), t.f_name, ' ', t.l_name) AS teacher_full_name,
+               sc.school_name
+        FROM supervision_sessions s
+        LEFT JOIN teacher t ON s.teacher_t_pid = t.t_pid
+        LEFT JOIN prefix p ON t.prefix_id = p.prefix_id
+        LEFT JOIN school sc ON t.school_id = sc.school_id
+        WHERE s.supervisor_p_id = ?
+          AND s.teacher_t_pid   = ?
+          AND s.subject_code    = ?
+          AND s.inspection_time = ?
+        LIMIT 1
+    ");
+    $stmt->execute([$s_pid, $t_pid, $sub_code, $time]);
     $session = $stmt->fetch(PDO::FETCH_ASSOC);
+
     if (!$session) {
         die('ไม่พบข้อมูลการนิเทศ');
     }
 
-    /* ===============================
-       2. ใช้ปีการศึกษาจากข้อมูลจริง
-    ================================ */
     $academic_year = $session['academic_year'];
 
     /* ===============================
-       3. บันทึก log ใบเกียรติบัตร
+       2. ตรวจว่ามีใบเกียรติบัตรแล้วหรือยัง
     ================================ */
-    $sql_log = "
-    INSERT IGNORE INTO certificate_log
-    (
-        supervisor_p_id,
-        teacher_t_pid,
-        subject_code,
-        inspection_time,
-        academic_year,
-        form_type,
-        generated_at
-    )
-    VALUES
-    (
-        :sid,
-        :tid,
-        :scode,
-        :time,
-        :ay,
-        :form_type,
-        NOW()
-    )
-    ";
-
-    $stmt_log = $conn->prepare($sql_log);
-    $stmt_log->execute([
-        ':sid'       => $s_pid,
-        ':tid'       => $t_pid,
-        ':scode'     => $sub_code,
-        ':time'      => $time,
-        ':ay'        => $academic_year,
-        ':form_type' => $form_type
-    ]);
+    $stmt = $conn->prepare("
+        SELECT id
+        FROM certificate_log
+        WHERE supervisor_p_id = ?
+          AND teacher_t_pid   = ?
+          AND subject_code    = ?
+          AND inspection_time = ?
+        LIMIT 1
+    ");
+    $stmt->execute([$s_pid, $t_pid, $sub_code, $time]);
+    $certificate_id = $stmt->fetchColumn();
 
     /* ===============================
-       4. คำนวณ Running No (ต่อปี + ประเภท)
+       3. ถ้ายังไม่มี → INSERT (AUTO_INCREMENT)
     ================================ */
-    $sql_rank = "
-    SELECT COUNT(*) AS cert_no
-    FROM certificate_log
-    WHERE academic_year = :ay
-      AND form_type = :form_type
-      AND generated_at <= (
-          SELECT generated_at
-          FROM certificate_log
-          WHERE supervisor_p_id = :sid
-            AND teacher_t_pid = :tid
-            AND subject_code = :scode
-            AND inspection_time = :time
-            AND academic_year = :ay
-            AND form_type = :form_type
-          ORDER BY generated_at DESC
-          LIMIT 1
-      )
-    ";
+    if (!$certificate_id) {
+        $stmt = $conn->prepare("
+            INSERT INTO certificate_log
+            (supervisor_p_id, teacher_t_pid, subject_code, inspection_time,
+             academic_year, form_type, generated_at)
+            VALUES (?, ?, ?, ?, ?, ?, NOW())
+        ");
+        $stmt->execute([
+            $s_pid,
+            $t_pid,
+            $sub_code,
+            $time,
+            $academic_year,
+            $form_type
+        ]);
 
-    $stmt_rank = $conn->prepare($sql_rank);
-    $stmt_rank->execute([
-        ':sid'       => $s_pid,
-        ':tid'       => $t_pid,
-        ':scode'     => $sub_code,
-        ':time'      => $time,
-        ':ay'        => $academic_year,
-        ':form_type' => $form_type
-    ]);
-
-    $certificate_running_no = $stmt_rank->fetchColumn() ?: 1;
+        $certificate_id = $conn->lastInsertId();
+    }
 } catch (PDOException $e) {
     die('DB Error: ' . $e->getMessage());
 }
@@ -189,7 +145,7 @@ $issue_date_parts = toThaiDate($session['satisfaction_date'] ?? date('Y-m-d'));
 
 $reference_number =
     'ศน.' .
-    toThaiNumber(str_pad($certificate_running_no, 4, '0', STR_PAD_LEFT)) .
+    toThaiNumber(str_pad($certificate_id, 5, '0', STR_PAD_LEFT)) .
     '/' .
     toThaiNumber($academic_year);
 
@@ -216,8 +172,7 @@ if (file_exists($bg)) {
 
 /* Fonts */
 $fontPath = __DIR__ . '/fonts/';
-$fontRegular = TCPDF_FONTS::addTTFfont($fontPath . 'eak_jindara.ttf', 'TrueTypeUnicode', '', 96);
-$fontBold    = TCPDF_FONTS::addTTFfont($fontPath . 'eak_chodok.ttf', 'TrueTypeUnicode', '', 96);
+$fontBold = TCPDF_FONTS::addTTFfont($fontPath . 'eak_chodok.ttf', 'TrueTypeUnicode', '', 96);
 
 $pdf->SetTextColor(8, 13, 86);
 

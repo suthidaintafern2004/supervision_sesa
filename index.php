@@ -2,12 +2,17 @@
 session_start();
 require_once 'config/db_connect.php';
 
+/* =========================
+   ROLE
+========================= */
 $allow_supervisor_admin = (
     isset($_SESSION['role']) &&
     $_SESSION['role'] === 'admin'
 );
 
-// --- ส่วนโลจิกนับจำนวนผู้เข้าชม (คงเดิม) ---
+/* =========================
+   SITE VIEW COUNTER
+========================= */
 if (!isset($_COOKIE['site_visited'])) {
     $update = $conn->prepare("UPDATE site_views SET total_views = total_views + 1");
     $update->execute();
@@ -18,84 +23,182 @@ $stmt = $conn->prepare("SELECT total_views FROM site_views LIMIT 1");
 $stmt->execute();
 $views = $stmt->fetchColumn();
 
-// --- ส่วนการตั้งค่า Pagination (เพิ่มเติม) ---
-$limit = 50; // จำนวนรายการต่อหน้า
-$page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] : 1;
+/* =========================
+   PAGINATION
+========================= */
+$limit  = 50;
+$page   = (isset($_GET['page']) && is_numeric($_GET['page'])) ? (int)$_GET['page'] : 1;
+$page   = max($page, 1);
 $offset = ($page - 1) * $limit;
 
-$search_name = $_GET['search_name'] ?? '';
+/* =========================
+   FILTER
+========================= */
+$search_name   = $_GET['search_name'] ?? '';
+$selected_year = $_GET['academic_year'] ?? '';
+
 $results = [];
 
+/* =========================
+   LOAD ACADEMIC YEARS
+========================= */
+$year_sql = "
+    SELECT DISTINCT academic_year FROM supervision_sessions WHERE academic_year IS NOT NULL
+    UNION
+    SELECT DISTINCT academic_year FROM quick_win WHERE academic_year IS NOT NULL
+    ORDER BY academic_year DESC
+";
+$stmt_year = $conn->prepare($year_sql);
+$stmt_year->execute();
+$academic_years = $stmt_year->fetchAll(PDO::FETCH_COLUMN);
+
 try {
-    // 1. หาจำนวนรายการทั้งหมดสำหรับแบ่งหน้า
-    $count_sql = "SELECT COUNT(t.t_pid) FROM teacher t 
-                  WHERE (t.t_pid IN (SELECT teacher_t_pid FROM supervision_sessions WHERE deleted_at IS NULL) 
-                  OR t.t_pid IN (SELECT t_pid FROM quick_win))";
+
+    /* =========================
+       COUNT TOTAL ROWS
+    ========================= */
+    $count_sql = "
+        SELECT COUNT(DISTINCT t.t_pid)
+        FROM teacher t
+        WHERE (
+            t.t_pid IN (
+                SELECT teacher_t_pid
+                FROM supervision_sessions
+                WHERE deleted_at IS NULL
+                " . (!empty($selected_year) ? " AND academic_year = :year " : "") . "
+            )
+            OR
+            t.t_pid IN (
+                SELECT t_pid
+                FROM quick_win
+                WHERE deleted_at IS NULL
+                " . (!empty($selected_year) ? " AND academic_year = :year " : "") . "
+            )
+        )
+    ";
+
     $count_params = [];
 
     if (!empty($search_name)) {
-        $count_sql .= " AND (CONCAT(IFNULL((SELECT prefix_name FROM prefix WHERE prefix_id = t.prefix_id),''), t.f_name, ' ', t.l_name) LIKE :search 
-                         OR (SELECT position_name FROM position WHERE position_id = t.position_id) LIKE :search)";
-        $count_params[':search'] = "%$search_name%";
+        $count_sql .= "
+            AND (
+                CONCAT(
+                    IFNULL((SELECT prefix_name FROM prefix WHERE prefix_id = t.prefix_id),''),
+                    t.f_name,' ',t.l_name
+                ) LIKE :search
+                OR
+                (SELECT position_name FROM position WHERE position_id = t.position_id) LIKE :search
+            )
+        ";
+        $count_params[':search'] = "%{$search_name}%";
+    }
+
+    if (!empty($selected_year)) {
+        $count_params[':year'] = $selected_year;
     }
 
     $stmt_count = $conn->prepare($count_sql);
     $stmt_count->execute($count_params);
-    $total_rows = $stmt_count->fetchColumn();
-    $total_pages = ceil($total_rows / $limit);
+    $total_rows  = (int)$stmt_count->fetchColumn();
+    $total_pages = max(ceil($total_rows / $limit), 1);
 
-    // 2. ดึงข้อมูลครู (เพิ่ม LIMIT และ OFFSET)
-    $sql = "SELECT 
-                t.t_pid AS teacher_t_pid,
-                CONCAT(IFNULL(p.prefix_name,''), t.f_name, ' ', t.l_name) AS teacher_full_name,
-                pos.position_name AS teacher_position,
-                s.school_name AS t_school,
-                (SELECT COUNT(*) FROM supervision_sessions WHERE teacher_t_pid = t.t_pid AND deleted_at IS NULL) AS count_normal,
-                (SELECT COUNT(*) FROM quick_win WHERE t_pid = t.t_pid) AS count_quickwin,
-                GREATEST(
-                    IFNULL((SELECT MAX(supervision_date)
-                        FROM supervision_sessions
-                        WHERE teacher_t_pid = t.t_pid
-                        AND deleted_at IS NULL
-                        ), '0000-00-00'),
-                    IFNULL((SELECT MAX(supervision_date) FROM quick_win WHERE t_pid = t.t_pid), '0000-00-00')
-                ) AS latest_date
-            FROM teacher t
-            LEFT JOIN prefix p ON t.prefix_id = p.prefix_id
-            LEFT JOIN school s ON t.school_id = s.school_id
-            LEFT JOIN position pos ON t.position_id = pos.position_id
-            WHERE (
-                t.t_pid IN (
-                    SELECT teacher_t_pid
+    /* =========================
+       MAIN DATA QUERY
+    ========================= */
+    $sql = "
+        SELECT 
+            t.t_pid AS teacher_t_pid,
+            CONCAT(IFNULL(p.prefix_name,''), t.f_name,' ',t.l_name) AS teacher_full_name,
+            pos.position_name AS teacher_position,
+            s.school_name AS t_school,
+
+            /* COUNT NORMAL */
+            (
+                SELECT COUNT(*)
+                FROM supervision_sessions
+                WHERE teacher_t_pid = t.t_pid
+                AND deleted_at IS NULL
+                " . (!empty($selected_year) ? " AND academic_year = :year " : "") . "
+            ) AS count_normal,
+
+            /* COUNT QUICK WIN */
+            (
+                SELECT COUNT(*)
+                FROM quick_win
+                WHERE t_pid = t.t_pid
+                AND deleted_at IS NULL
+                " . (!empty($selected_year) ? " AND academic_year = :year " : "") . "
+            ) AS count_quickwin,
+
+            /* LATEST DATE */
+            GREATEST(
+                IFNULL((
+                    SELECT MAX(supervision_date)
                     FROM supervision_sessions
-                    WHERE deleted_at IS NULL
+                    WHERE teacher_t_pid = t.t_pid
+                    AND deleted_at IS NULL
+                    " . (!empty($selected_year) ? " AND academic_year = :year " : "") . "
+                ), '0000-00-00'),
+                IFNULL((
+                    SELECT MAX(supervision_date)
+                    FROM quick_win
+                    WHERE t_pid = t.t_pid
+                    AND deleted_at IS NULL
+                    " . (!empty($selected_year) ? " AND academic_year = :year " : "") . "
+                ), '0000-00-00')
+            ) AS latest_date
+
+        FROM teacher t
+        LEFT JOIN prefix p   ON t.prefix_id = p.prefix_id
+        LEFT JOIN position pos ON t.position_id = pos.position_id
+        LEFT JOIN school s   ON t.school_id = s.school_id
+
+        WHERE (
+            t.t_pid IN (
+                SELECT teacher_t_pid
+                FROM supervision_sessions
+                WHERE deleted_at IS NULL
+                " . (!empty($selected_year) ? " AND academic_year = :year " : "") . "
             )
-                OR 
-                t.t_pid IN (SELECT t_pid FROM quick_win)
-            )";
+            OR
+            t.t_pid IN (
+                SELECT t_pid
+                FROM quick_win
+                WHERE deleted_at IS NULL
+                " . (!empty($selected_year) ? " AND academic_year = :year " : "") . "
+            )
+        )
+    ";
 
     $params = [];
+
     if (!empty($search_name)) {
-        $search_term = "%" . $search_name . "%";
-        $sql .= " AND (CONCAT(IFNULL(p.prefix_name,''), t.f_name, ' ', t.l_name) LIKE :search 
-                 OR pos.position_name LIKE :search)";
-        $params[':search'] = $search_term;
+        $sql .= "
+            AND (
+                CONCAT(IFNULL(p.prefix_name,''), t.f_name,' ',t.l_name) LIKE :search
+                OR pos.position_name LIKE :search
+            )
+        ";
+        $params[':search'] = "%{$search_name}%";
     }
 
     $sql .= " ORDER BY latest_date DESC LIMIT :limit OFFSET :offset";
 
     $stmt = $conn->prepare($sql);
-    // ใช้ bindValue เพื่อให้ Limit/Offset ทำงานถูกต้องใน PDO
-    $stmt->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
-    $stmt->bindValue(':offset', (int)$offset, PDO::PARAM_INT);
+    $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+    $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+
+    if (!empty($selected_year)) {
+        $stmt->bindValue(':year', $selected_year, PDO::PARAM_INT);
+    }
     if (!empty($search_name)) {
-        $stmt->bindValue(':search', $search_term, PDO::PARAM_STR);
+        $stmt->bindValue(':search', "%{$search_name}%", PDO::PARAM_STR);
     }
 
     $stmt->execute();
-    $results = $stmt->fetchAll();
+    $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
-    echo '<div class="alert alert-danger">เกิดข้อผิดพลาด: ' . $e->getMessage() . '</div>';
+    echo '<div class="alert alert-danger">เกิดข้อผิดพลาด: ' . htmlspecialchars($e->getMessage()) . '</div>';
 }
 ?>
 
@@ -232,14 +335,36 @@ try {
                 </div>
             <?php endif; ?>
 
-            <form method="GET" class="mb-3">
-                <div class="input-group">
-                    <input type="text" name="search_name" class="form-control"
-                        placeholder="ค้นหาครู..." value="<?= htmlspecialchars($search_name) ?>">
-                    <button class="btn btn-warning"><i class="fas fa-search"></i></button>
-                    <a href="index.php" class="btn btn-secondary"><i class="fas fa-redo"></i></a>
+            <form method="GET" class="mb-3" id="filterForm">
+                <div class="row g-2">
+
+                    <!-- ฟิลเตอร์ปีการศึกษา -->
+                    <div class="col-md-2">
+                        <select name="academic_year" class="form-select"
+                            onchange="document.getElementById('filterForm').submit();">
+                            <option value="">ทุกปีการศึกษา</option>
+                            <?php foreach ($academic_years as $year): ?>
+                                <option value="<?= $year ?>" <?= ($selected_year == $year) ? 'selected' : '' ?>>
+                                    ปีการศึกษา <?= $year ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <!-- ค้นหาชื่อ -->
+                    <div class="col-md-8">
+                        <input type="text" name="search_name" class="form-control"
+                            placeholder="ค้นหาครู..." value="<?= htmlspecialchars($search_name) ?>">
+                    </div>
+
+                    <div class="col-md-2 d-flex gap-1">
+                        <button class="btn btn-warning w-100"><i class="fas fa-search"></i></button>
+                        <a href="index.php" class="btn btn-secondary w-100"><i class="fas fa-redo"></i></a>
+                    </div>
+
                 </div>
             </form>
+
 
             <div class="table-responsive" id="search-results">
                 <table class="table table-hover align-middle teacher-table">
@@ -268,9 +393,14 @@ try {
                                             <?= $row['count_normal'] + $row['count_quickwin'] ?>
                                         </span>
                                     </td>
+
                                     <td class="text-center">
                                         <form action="session_details.php" method="POST">
                                             <input type="hidden" name="teacher_pid" value="<?= $row['teacher_t_pid'] ?>">
+
+                                            <!-- ⭐ ส่งปีการศึกษาที่เลือกไปด้วย -->
+                                            <input type="hidden" name="academic_year" value="<?= htmlspecialchars($selected_year) ?>">
+
                                             <button class="btn btn-info btn-sm">
                                                 <i class="fas fa-eye"></i> ดูประวัติ
                                             </button>

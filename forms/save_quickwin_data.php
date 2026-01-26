@@ -78,6 +78,7 @@ $t_id         = trim($_POST['teacher_t_pid'] ?? '');
 $option_ids   = $_POST['option_ids'] ?? [];
 $option_other = trim($_POST['option_other'] ?? '');
 $academic_year_post = (int)($_POST['academic_year'] ?? 0);
+$semester = (int)($_POST['semester'] ?? 0);
 
 $supervision_date = date('Y-m-d H:i:s');
 
@@ -88,6 +89,7 @@ if (
     $p_id === '' ||
     $t_id === '' ||
     $academic_year_post === 0 ||
+    $semester === 0 ||
     (empty($option_ids) && $option_other === '')
 ) {
     redirect_with_flash_message(
@@ -146,9 +148,9 @@ try {
     /* ---------- 1) บันทึก quick_win ---------- */
     $sql = "
         INSERT INTO quick_win
-            (p_id, t_pid, options, option_other, supervision_date, academic_year)
+            (p_id, t_pid, options, option_other, supervision_date, academic_year, semester)
             VALUES
-            (:pid, :tid, :opt, :other, :sdate, :ay)
+            (:pid, :tid, :opt, :other, :sdate, :ay, :semester)
                 ";
 
     $stmt = $conn->prepare($sql);
@@ -158,7 +160,8 @@ try {
         ':opt'   => $options_str,
         ':other' => $option_other,
         ':sdate' => $supervision_date,
-        ':ay'    => $academic_year
+        ':ay'    => $academic_year,
+        ':semester' => $semester
     ]);
 
     $quickwin_id = $conn->lastInsertId();
@@ -228,9 +231,12 @@ try {
 
     unset($_SESSION['inspection_data']);
 
+    // ✅ เพิ่มบรรทัดนี้
+    $_SESSION['flash_from'] = 'quickwin_save';
+
     redirect_with_flash_message(
         "บันทึก Quick Win ปีการศึกษา {$academic_year} สำเร็จ",
-        '../index.php',
+        'quickwin_form.php',   // หรือ index.php ตาม flow ที่คุณใช้
         'success'
     );
 } catch (PDOException $e) {

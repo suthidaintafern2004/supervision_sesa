@@ -31,10 +31,12 @@ require_once __DIR__ . '/config/app.php';
 ========================= */
 $teacher   = trim($_GET['teacher'] ?? '');
 $form_type = $_GET['form_type'] ?? '';
+$academic_year  = $_GET['academic_year'] ?? '';
 
 $queryString = http_build_query([
     'teacher'   => $teacher,
-    'form_type' => $form_type
+    'form_type' => $form_type,
+    'academic_year'  => $academic_year
 ]);
 
 /* =========================
@@ -60,6 +62,11 @@ if ($form_type !== '') {
     $params[] = $form_type;
 }
 
+if ($academic_year !== '') {
+    $where[]  = 'academic_year = ?';
+    $params[] = $academic_year;
+}
+
 $whereSQL = $where ? 'WHERE ' . implode(' AND ', $where) : '';
 
 /* =========================
@@ -69,7 +76,8 @@ $countSql = "
 SELECT COUNT(*) FROM (
     SELECT 
         CONCAT(p.prefix_name,' ',t.f_name,' ',t.l_name) AS teacher_name,
-        'classroom' AS form_type
+        'classroom' AS form_type,
+        ss.academic_year
     FROM supervision_sessions ss
     LEFT JOIN teacher t ON ss.teacher_t_pid = t.t_pid
     LEFT JOIN prefix p ON t.prefix_id = p.prefix_id
@@ -79,10 +87,15 @@ SELECT COUNT(*) FROM (
 
     SELECT
         CONCAT(p2.prefix_name,' ',t2.f_name,' ',t2.l_name) AS teacher_name,
-        'quickwin' AS form_type
+        'quickwin' AS form_type,
+        qw.academic_year
     FROM quick_win qw
-    LEFT JOIN teacher t2 ON qw.t_pid = t2.t_pid
-    LEFT JOIN prefix p2 ON t2.prefix_id = p2.prefix_id
+        LEFT JOIN teacher t2 ON qw.t_pid = t2.t_pid
+        LEFT JOIN prefix p2 ON t2.prefix_id = p2.prefix_id
+        LEFT JOIN school s2 ON t2.school_id = s2.school_id
+        LEFT JOIN supervisor sp2 ON qw.p_id = sp2.p_id
+        LEFT JOIN prefix pr2 ON sp2.prefix_id = pr2.prefix_id
+        WHERE qw.deleted_at IS NULL
 ) all_forms
 $whereSQL
 ";
@@ -106,6 +119,7 @@ FROM (
         ss.subject_name,
         ss.inspection_time,
         ss.supervision_date,
+        ss.academic_year,
         CONCAT(p.prefix_name,' ',t.f_name,' ',t.l_name) AS teacher_name,
         s.school_name,
         CONCAT(IFNULL(pr.prefix_name,''), sp.fname,' ',sp.lname) AS supervisor_name
@@ -127,15 +141,17 @@ FROM (
         'Quick Win',
         NULL,
         qw.supervision_date,
+        qw.academic_year,
         CONCAT(p2.prefix_name,' ',t2.f_name,' ',t2.l_name),
         s2.school_name,
         CONCAT(IFNULL(pr2.prefix_name,''), sp2.fname,' ',sp2.lname)
     FROM quick_win qw
-    LEFT JOIN teacher t2 ON qw.t_pid = t2.t_pid
-    LEFT JOIN prefix p2 ON t2.prefix_id = p2.prefix_id
-    LEFT JOIN school s2 ON t2.school_id = s2.school_id
-    LEFT JOIN supervisor sp2 ON qw.p_id = sp2.p_id
-    LEFT JOIN prefix pr2 ON sp2.prefix_id = pr2.prefix_id
+        LEFT JOIN teacher t2 ON qw.t_pid = t2.t_pid
+        LEFT JOIN prefix p2 ON t2.prefix_id = p2.prefix_id
+        LEFT JOIN school s2 ON t2.school_id = s2.school_id
+        LEFT JOIN supervisor sp2 ON qw.p_id = sp2.p_id
+        LEFT JOIN prefix pr2 ON sp2.prefix_id = pr2.prefix_id
+        WHERE qw.deleted_at IS NULL
 ) all_forms
 $whereSQL
 ORDER BY supervision_date DESC
@@ -145,6 +161,31 @@ LIMIT $limit OFFSET $offset
 $stmt = $conn->prepare($sql);
 $stmt->execute($params);
 $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+/* =========================
+   FETCH ACADEMIC YEARS
+========================= */
+$yearSql = "
+SELECT DISTINCT academic_year
+FROM (
+    SELECT academic_year
+    FROM supervision_sessions
+    WHERE deleted_at IS NULL
+      AND academic_year IS NOT NULL
+
+    UNION
+
+    SELECT academic_year
+    FROM quick_win
+    WHERE deleted_at IS NULL
+      AND academic_year IS NOT NULL
+) y
+ORDER BY academic_year DESC
+";
+
+$yearStmt = $conn->query($yearSql);
+$academicYears = $yearStmt->fetchAll(PDO::FETCH_COLUMN);
+
 ?>
 <!DOCTYPE html>
 <html lang="th">
@@ -184,13 +225,26 @@ $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             value="<?= htmlspecialchars($teacher) ?>">
                     </div>
 
-                    <div class="col-md-4">
+                    <div class="col-md-2">
                         <label class="fw-bold">ประเภทแบบฟอร์ม</label>
                         <select name="form_type" class="form-select"
                             onchange="this.form.submit()">
                             <option value="">ทั้งหมด</option>
                             <option value="classroom" <?= $form_type === 'classroom' ? 'selected' : '' ?>>ชั้นเรียน</option>
                             <option value="quickwin" <?= $form_type === 'quickwin' ? 'selected' : '' ?>>Quick Win</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-2">
+                        <label class="fw-bold">ปีการศึกษา</label>
+                        <select name="academic_year" class="form-select" onchange="this.form.submit()">
+                            <option value="">ทั้งหมด</option>
+                            <?php foreach ($academicYears as $year): ?>
+                                <option value="<?= $year ?>"
+                                    <?= $academic_year == $year ? 'selected' : '' ?>>
+                                    <?= $year ?>
+                                </option>
+                            <?php endforeach; ?>
                         </select>
                     </div>
 
@@ -215,6 +269,7 @@ $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             <th>วิชา</th>
                             <th class="text-center">ครั้งที่</th>
                             <th class="text-center">ประเภท</th>
+                            <!-- <th class="text-center">ปีการศึกษา</th> -->
                             <th>ผู้นิเทศ</th>
                             <th class="text-center">วันที่</th>
                             <th class="text-center">จัดการ</th>
@@ -226,7 +281,7 @@ $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <td colspan="8" class="text-center text-danger py-4">ไม่พบข้อมูล</td>
                             </tr>
                             <?php else: foreach ($rows as $r): ?>
-                                <tr>
+                                <tr data-row>
                                     <td><?= htmlspecialchars($r['teacher_name']) ?></td>
                                     <td><?= htmlspecialchars($r['school_name']) ?></td>
                                     <td><?= htmlspecialchars($r['subject_name']) ?></td>
@@ -236,6 +291,7 @@ $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                             <?= $r['form_type'] === 'classroom' ? 'ชั้นเรียน' : 'Quick Win' ?>
                                         </span>
                                     </td>
+                                    <!-- <td class="text-center"><?= htmlspecialchars($r['academic_year'] ?? '-') ?></td> -->
                                     <td><?= htmlspecialchars($r['supervisor_name']) ?></td>
                                     <td class="text-center"><?= date('d/m/Y', strtotime($r['supervision_date'])) ?></td>
                                     <td class="text-center">
@@ -243,16 +299,26 @@ $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                         <?php if ($r['form_type'] === 'classroom'): ?>
 
                                             <!-- EDIT CLASSROOM -->
-                                            <a href="<?= BASE_URL ?>/classroom/kpi_edit.php?t_pid=<?= urlencode($r['t_pid']) ?>&subject_code=<?= urlencode($r['subject_code']) ?>&inspection_time=<?= (int)$r['inspection_time'] ?>"
-                                                class="btn btn-sm btn-warning me-1"
-                                                title="แก้ไขชั้นเรียน">
-                                                <i class="fas fa-edit"></i>
-                                            </a>
+                                            <form method="POST"
+                                                action="<?= BASE_URL ?>/classroom/kpi_edit.php"
+                                                class="d-inline">
+
+                                                <input type="hidden" name="kpi_ref[t_pid]" value="<?= htmlspecialchars($r['t_pid']) ?>">
+                                                <input type="hidden" name="kpi_ref[subject_code]" value="<?= htmlspecialchars($r['subject_code']) ?>">
+                                                <input type="hidden" name="kpi_ref[inspection_time]" value="<?= htmlspecialchars($r['inspection_time']) ?>">
+
+                                                <button type="submit"
+                                                    class="btn btn-sm btn-warning me-1"
+                                                    title="แก้ไข Classroom">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                            </form>
 
                                             <!-- DELETE CLASSROOM -->
                                             <form method="POST"
                                                 action="<?= BASE_URL ?>/classroom/delete_kpi_session.php"
-                                                class="d-inline delete-soft-form">
+                                                class="d-inline delete-soft-form"
+                                                data-type="classroom">
 
                                                 <input type="hidden" name="supervisor_p_id" value="<?= $r['supervisor_p_id'] ?>">
                                                 <input type="hidden" name="t_pid" value="<?= $r['t_pid'] ?>">
@@ -268,17 +334,27 @@ $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
                                         <?php else: ?>
 
-                                            <!-- EDIT QUICK WIN -->
-                                            <a href="<?= BASE_URL ?>/quickwin/quickwin_edit.php?t_pid=<?= urlencode($r['t_pid']) ?>&p_id=<?= urlencode($r['supervisor_p_id']) ?>&supervision_date=<?= urlencode($r['supervision_date']) ?>"
-                                                class="btn btn-sm btn-info me-1"
-                                                title="แก้ไข Quick Win">
-                                                <i class="fas fa-edit"></i>
-                                            </a>
+                                            <!-- EDIT QUICK WIN (NO URL PARAM) -->
+                                            <form method="POST"
+                                                action="<?= BASE_URL ?>/quickwin/quickwin_edit.php"
+                                                class="d-inline">
+
+                                                <input type="hidden" name="qw_ref[t_pid]" value="<?= htmlspecialchars($r['t_pid']) ?>">
+                                                <input type="hidden" name="qw_ref[p_id]" value="<?= htmlspecialchars($r['supervisor_p_id']) ?>">
+                                                <input type="hidden" name="qw_ref[supervision_date]" value="<?= htmlspecialchars($r['supervision_date']) ?>">
+
+                                                <button type="submit"
+                                                    class="btn btn-sm btn-info me-1"
+                                                    title="แก้ไข Quick Win">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                            </form>
 
                                             <!-- DELETE QUICK WIN -->
                                             <form method="POST"
                                                 action="<?= BASE_URL ?>/quickwin/delete_quickwin.php"
-                                                class="d-inline delete-soft-form">
+                                                class="d-inline delete-soft-form"
+                                                data-type="quickwin">
 
                                                 <input type="hidden" name="p_id" value="<?= $r['supervisor_p_id'] ?>">
                                                 <input type="hidden" name="t_pid" value="<?= $r['t_pid'] ?>">
@@ -334,9 +410,35 @@ $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     cancelButtonText: 'ยกเลิก',
                     confirmButtonColor: '#dc3545'
                 }).then(result => {
-                    if (result.isConfirmed) {
-                        form.submit();
-                    }
+                    if (!result.isConfirmed) return;
+
+                    const formData = new FormData(form);
+
+                    fetch(form.action, {
+                            method: 'POST',
+                            body: formData
+                        })
+                        .then(res => res.json())
+                        .then(data => {
+                            if (data.status === 'success') {
+                                Swal.fire({
+                                    icon: 'success',
+                                    title: 'สำเร็จ',
+                                    text: 'ย้ายข้อมูลไปถังขยะแล้ว',
+                                    timer: 1200,
+                                    showConfirmButton: false
+                                });
+
+                                // ⭐ ลบแถวออกจากตารางทันที
+                                form.closest('tr').remove();
+
+                            } else {
+                                Swal.fire('ผิดพลาด', data.message, 'error');
+                            }
+                        })
+                        .catch(() => {
+                            Swal.fire('ผิดพลาด', 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้', 'error');
+                        });
                 });
             });
         });

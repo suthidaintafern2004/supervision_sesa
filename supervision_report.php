@@ -10,6 +10,29 @@ require_once 'config/db_connect.php';
 //     exit();
 // }
 
+function thaiNumber($num)
+{
+    return str_replace(
+        ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'],
+        ['๐', '๑', '๒', '๓', '๔', '๕', '๖', '๗', '๘', '๙'],
+        $num
+    );
+}
+
+function thaiSemester($semester)
+{
+    switch ((int)$semester) {
+        case 1:
+            return '๑';
+        case 2:
+            return '๒';
+        case 3:
+            return '๓';
+        default:
+            return '-';
+    }
+}
+
 // 1.1 รับค่า (รองรับทั้ง GET และ POST)
 $s_pid   = $_REQUEST['s_pid'] ?? $_SESSION['user_id'] ?? null;
 $t_pid   = $_REQUEST['t_pid'] ?? null;
@@ -173,6 +196,7 @@ if ($kpi) {
     } catch (PDOException $e) {
     }
 }
+
 ?>
 
 <!DOCTYPE html>
@@ -197,7 +221,15 @@ if ($kpi) {
                 <div class="card shadow-lg">
                     <div class="text-center mb-5 mt-4" style="margin-bottom: 20px !important;">
                         <img src="images/logo.png" alt="โลโก้กระทรวงศึกษาธิการ" style="max-width: 80px; margin-bottom: 10px;">
-                        <p style="margin-bottom: 0; font-weight: bold; font-size: 0.95rem;">รายงานผลการนิเทศทักษะการจัดการเรียนรู้และการจัดการชั้นเรียน ภาคเรียนที่ ๒ ปีการศึกษา ๒๕๖๘</p>
+                        <p style="margin-bottom: 0; font-weight: bold; font-size: 0.95rem;">
+                            รายงานผลการนิเทศทักษะการจัดการเรียนรู้และการจัดการชั้นเรียน
+                            <?php
+                            $semester = $kpi['semester'] ?? null;
+                            $academic_year = $kpi['academic_year'] ?? null;
+                            ?>
+                            ภาคเรียนที่ <?= thaiSemester($semester) ?>
+                            ปีการศึกษา <?= $academic_year ? thaiNumber($academic_year) : '-' ?>
+                        </p>
                         <p style="margin-bottom: 0; font-weight: bold; font-size: 0.9rem;">สำนักงานเขตพื้นที่การศึกษามัธยมศึกษาลำปาง ลำพูน</p>
                     </div>
 
@@ -222,7 +254,12 @@ if ($kpi) {
                                     <div class="d-flex gap-3 flex-wrap">
                                         <span class="badge bg-info text-dark"><i class="fas fa-book"></i> วิชา: <?= htmlspecialchars($kpi['subject_code'] ?? '') ?> - <?= htmlspecialchars($kpi['subject_name'] ?? '-') ?></span>
                                         <span class="badge bg-warning text-dark"><i class="fas fa-clock"></i> ครั้งที่: <?= htmlspecialchars($kpi['inspection_time'] ?? '-') ?></span>
-                                        <span class="badge bg-secondary"><i class="fas fa-calendar-alt"></i> วันที่: <?= !empty($kpi['supervision_date']) ? date('d/m/Y', strtotime($kpi['supervision_date'])) : '-' ?></span>
+                                        <span class="badge bg-secondary">
+                                            <i class="fas fa-calendar-alt"></i>
+                                            วันที่: <?= !empty($kpi['inspection_date'])
+                                                        ? date('d/m/Y', strtotime($kpi['inspection_date']))
+                                                        : '-' ?>
+                                        </span>
                                     </div>
                                 </div>
                             </div>
@@ -291,7 +328,7 @@ if ($kpi) {
                                     <span class="badge bg-<?= $eval_color ?>">ระดับ <?= $eval_level ?></span>
                                 </div>
                             </div>
-                            
+
                             <div class="mb-4">
                                 <h5 class="text-primary fw-bold mb-2">
                                     <i class="fas fa-comment-dots"></i> ข้อเสนอแนะเพิ่มเติม (ภาพรวม)
