@@ -283,3 +283,49 @@ try {
     error_log("SAVE_KPI_ERROR: " . $e->getMessage());
     exit("เกิดข้อผิดพลาดทางระบบ กรุณาตรวจสอบ error log");
 }
+
+// ==============================
+// Upload รูป (ไม่อยู่ใน transaction)
+// ==============================
+try {
+
+    if (
+        isset($_FILES['images']) &&
+        is_array($_FILES['images']['tmp_name']) &&
+        !empty($_FILES['images']['tmp_name'][0])
+    ) {
+
+        $stmtImg = $conn->prepare("
+            INSERT INTO images
+            (supervisor_p_id, teacher_t_pid, subject_code,
+             inspection_time, file_name, academic_year, form_type)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ");
+
+        for ($i = 0; $i < min(2, count($_FILES['images']['tmp_name'])); $i++) {
+
+            if ($_FILES['images']['error'][$i] !== UPLOAD_ERR_OK) continue;
+
+            $tmp = $_FILES['images']['tmp_name'][$i];
+            if (!is_uploaded_file($tmp)) continue;
+
+            $ext = strtolower(pathinfo($_FILES['images']['name'][$i], PATHINFO_EXTENSION));
+            if (!in_array($ext, ['jpg', 'jpeg', 'png', 'webp'])) continue;
+
+            $newName = uniqid('img_', true) . '.' . $ext;
+            move_uploaded_file($tmp, __DIR__ . '/uploads/' . $newName);
+
+            $stmtImg->execute([
+                $supervisor_p_id,
+                $teacher_t_pid,
+                $subject_code,
+                $inspection_time,
+                $newName,
+                $academic_year,
+                'cr'
+            ]);
+        }
+    }
+} catch (Exception $e) {
+    error_log('IMAGE UPLOAD FAIL: ' . $e->getMessage());
+}

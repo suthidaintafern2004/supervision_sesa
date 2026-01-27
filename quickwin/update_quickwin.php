@@ -1,7 +1,7 @@
 <?php
 
 /****************************************
- * QUICK WIN UPDATE (PRODUCTION FINAL)
+ * QUICK WIN UPDATE – FINAL PRODUCTION
  ****************************************/
 
 error_reporting(E_ALL);
@@ -31,11 +31,12 @@ $old_date   = $_POST['old_supervision_date'] ?? null;
 $new_t_pid  = $_POST['new_t_pid'] ?? null;
 $new_p_id   = $_POST['new_p_id'] ?? null;
 
-$option_ids   = $_POST['options'] ?? [];
-$option_other = trim($_POST['option_other'] ?? '');
+$option_ids     = $_POST['options'] ?? [];
+$option_other   = trim($_POST['option_other'] ?? '');
 $new_academic_year = $_POST['academic_year'] ?? null;
+$semester       = $_POST['semester'] ?? null;
 
-$form_type = 'qw'; // FIXED สำหรับ Quick Win
+$form_type = 'qw';
 
 $delete_image_ids = $_POST['delete_image_ids'] ?? [];
 $delete_image_ids = is_array($delete_image_ids)
@@ -47,7 +48,8 @@ $delete_image_ids = is_array($delete_image_ids)
 ========================= */
 if (
     !$old_t_pid || !$old_p_id || !$old_date ||
-    !$new_t_pid || !$new_p_id || !$new_academic_year
+    !$new_t_pid || !$new_p_id ||
+    !$new_academic_year || !$semester
 ) {
     exit('ข้อมูลไม่ครบ');
 }
@@ -76,23 +78,52 @@ $options_string = implode('/', $option_ids);
 try {
     $conn->beginTransaction();
 
+    /* ==================================================
+       1) CHECK DUPLICATE
+       ครู 1 คน / 1 ปีการศึกษา (ไม่สน p_id)
+    ================================================== */
+    $checkStmt = $conn->prepare("
+        SELECT 1
+        FROM quick_win
+        WHERE t_pid = ?
+          AND academic_year = ?
+          AND NOT (
+              t_pid = ?
+              AND academic_year = ?
+              AND supervision_date = ?
+          )
+        LIMIT 1
+    ");
+    $checkStmt->execute([
+        $new_t_pid,
+        $new_academic_year,
+        $old_t_pid,
+        $new_academic_year,
+        $old_date
+    ]);
+
+    if ($checkStmt->fetch()) {
+        throw new Exception(
+            'ครูคนนี้ได้รับการนิเทศ Quick Win ในปีการศึกษานี้แล้ว กรุณาไปแก้ไขจากรายการเดิม'
+        );
+    }
+
     /* =========================
-       1) DELETE IMAGES (ที่ผู้ใช้กดลบ)
+       2) DELETE IMAGES
     ========================= */
     if (!empty($delete_image_ids)) {
 
         $in = implode(',', array_fill(0, count($delete_image_ids), '?'));
 
         $stmtSel = $conn->prepare("
-            SELECT id, file_name
+            SELECT file_name
             FROM images
             WHERE id IN ($in)
               AND form_type = 'qw'
         ");
         $stmtSel->execute($delete_image_ids);
-        $files = $stmtSel->fetchAll(PDO::FETCH_ASSOC);
 
-        foreach ($files as $f) {
+        foreach ($stmtSel->fetchAll(PDO::FETCH_ASSOC) as $f) {
             $path = __DIR__ . '/../uploads/quickwin/' . $f['file_name'];
             if (is_file($path)) {
                 unlink($path);
@@ -108,7 +139,7 @@ try {
     }
 
     /* =========================
-       2) UPDATE QUICK_WIN
+       3) UPDATE QUICK WIN
     ========================= */
     $stmt = $conn->prepare("
         UPDATE quick_win
@@ -118,25 +149,26 @@ try {
             options = ?,
             option_other = ?,
             academic_year = ?,
+            semester = ?,
             updated_at = NOW()
         WHERE t_pid = ?
           AND p_id = ?
           AND supervision_date = ?
     ");
-
     $stmt->execute([
         $new_t_pid,
         $new_p_id,
         $options_string,
         $option_other,
         $new_academic_year,
+        $semester,
         $old_t_pid,
         $old_p_id,
         $old_date
     ]);
 
     /* =========================
-       3) SYNC IMAGE META (รูปที่เหลืออยู่)
+       4) SYNC IMAGE META
     ========================= */
     $stmtImgSync = $conn->prepare("
         UPDATE images
@@ -147,7 +179,6 @@ try {
           AND inspection_time IS NULL
           AND form_type = 'qw'
     ");
-
     $stmtImgSync->execute([
         $new_academic_year,
         $new_p_id,
@@ -155,7 +186,7 @@ try {
     ]);
 
     /* =========================
-       4) ADD NEW IMAGES
+       5) ADD NEW IMAGES
     ========================= */
     if (!empty($_FILES['quickwin_images']['name'][0])) {
 
@@ -172,10 +203,8 @@ try {
             $new_t_pid,
             $new_academic_year
         ]);
-        $existingCount = (int)$countStmt->fetchColumn();
 
-        $newFilesCount = count($_FILES['quickwin_images']['name']);
-        if (($existingCount + $newFilesCount) > 2) {
+        if ((int)$countStmt->fetchColumn() + count($_FILES['quickwin_images']['name']) > 2) {
             throw new Exception('แนบรูปได้ไม่เกิน 2 รูป');
         }
 
@@ -184,40 +213,29 @@ try {
             mkdir($uploadDir, 0777, true);
         }
 
-        $allowedExt = ['jpg', 'jpeg', 'png'];
-
         foreach ($_FILES['quickwin_images']['name'] as $i => $name) {
 
-            if ($_FILES['quickwin_images']['error'][$i] !== UPLOAD_ERR_OK) {
-                continue;
-            }
+            if ($_FILES['quickwin_images']['error'][$i] !== UPLOAD_ERR_OK) continue;
 
             $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
-            if (!in_array($ext, $allowedExt)) {
-                continue;
-            }
+            if (!in_array($ext, ['jpg', 'jpeg', 'png'])) continue;
 
-            $newFileName =
-                'qw_' . $new_t_pid . '_' . time() . '_' . rand(1000, 9999) . '.' . $ext;
+            $fileName = 'qw_' . $new_t_pid . '_' . time() . '_' . rand(1000, 9999) . '.' . $ext;
 
             if (move_uploaded_file(
                 $_FILES['quickwin_images']['tmp_name'][$i],
-                $uploadDir . $newFileName
+                $uploadDir . $fileName
             )) {
-
-                $stmtInsertImg = $conn->prepare("
+                $stmtInsert = $conn->prepare("
                     INSERT INTO images
-                        (supervisor_p_id, teacher_t_pid,
-                         subject_code, inspection_time,
-                         file_name, form_type, academic_year)
-                    VALUES
-                        (?, ?, NULL, NULL, ?, 'qw', ?)
+                    (supervisor_p_id, teacher_t_pid, subject_code, inspection_time,
+                     file_name, form_type, academic_year)
+                    VALUES (?, ?, NULL, NULL, ?, 'qw', ?)
                 ");
-
-                $stmtInsertImg->execute([
+                $stmtInsert->execute([
                     $new_p_id,
                     $new_t_pid,
-                    $newFileName,
+                    $fileName,
                     $new_academic_year
                 ]);
             }
@@ -231,12 +249,28 @@ try {
 
     $_SESSION['flash_message'] = 'บันทึกการแก้ไข Quick Win สำเร็จ';
     $_SESSION['flash_type'] = 'success';
-
     header('Location: ../my_sessions_list.php');
+    exit;
+} catch (PDOException $e) {
+
+    $conn->rollBack();
+
+    if ($e->getCode() === '23000') {
+        $_SESSION['flash_message']
+            = 'ครูคนนี้ได้รับการนิเทศ Quick Win ในปีการศึกษานี้แล้ว กรุณาไปแก้ไขจากรายการเดิม';
+    } else {
+        $_SESSION['flash_message'] = $e->getMessage();
+    }
+
+    $_SESSION['flash_type'] = 'warning';
+    header('Location: ' . $_SERVER['HTTP_REFERER']);
     exit;
 } catch (Exception $e) {
 
     $conn->rollBack();
-    echo '<pre>ERROR: ' . $e->getMessage();
+
+    $_SESSION['flash_message'] = $e->getMessage();
+    $_SESSION['flash_type'] = 'warning';
+    header('Location: ' . $_SERVER['HTTP_REFERER']);
     exit;
 }

@@ -111,6 +111,11 @@ if (!$data) {
 }
 
 /* =========================
+   SEMESTER (ภาคเรียน)
+========================= */
+$savedSemester = $data['semester'] ?? 1;
+
+/* =========================
    CALCULATE ACADEMIC YEAR
 ========================= */
 $currentYear = (int)date('Y');
@@ -286,6 +291,18 @@ $images = $stmtImg->fetchAll(PDO::FETCH_ASSOC);
                                     <div class="col-md-6">
                                         <small class="text-muted">วันที่บันทึก</small>
                                         <div><?= date('d/m/Y H:i', strtotime($data['supervision_date'])) ?></div>
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <label class="text-muted">ภาคเรียน</label>
+                                        <select name="semester" class="form-select" required>
+                                            <option value="1" <?= $savedSemester == 1 ? 'selected' : '' ?>>
+                                                ภาคเรียนที่ 1
+                                            </option>
+                                            <option value="2" <?= $savedSemester == 2 ? 'selected' : '' ?>>
+                                                ภาคเรียนที่ 2
+                                            </option>
+                                        </select>
                                     </div>
 
                                     <div class="col-md-6">
@@ -576,7 +593,19 @@ $images = $stmtImg->fetchAll(PDO::FETCH_ASSOC);
         }
     </script>
 
-
+    <?php if (!empty($_SESSION['flash_message'])): ?>
+        <script>
+            Swal.fire({
+                icon: '<?= $_SESSION['flash_type'] ?>',
+                title: 'ไม่สามารถบันทึกได้',
+                text: '<?= addslashes($_SESSION['flash_message']) ?>',
+                confirmButtonColor: '#dc3545'
+            });
+        </script>
+    <?php
+        unset($_SESSION['flash_message'], $_SESSION['flash_type']);
+    endif;
+    ?>
 </body>
 
 </html>

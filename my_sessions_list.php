@@ -209,8 +209,8 @@ $academicYears = $yearStmt->fetchAll(PDO::FETCH_COLUMN);
                 </span>
             </h4>
 
-            <a href="index.php" class="btn btn-secondary btn-sm">
-                <i class="fas fa-arrow-left"></i> กลับหน้าหลัก
+            <a href="index.php" class="btn btn-danger shadow-sm rounded-pill px-4">
+                <i class="fas fa-arrow-left me-2"></i> ย้อนกลับ
             </a>
         </div>
 
@@ -230,7 +230,7 @@ $academicYears = $yearStmt->fetchAll(PDO::FETCH_COLUMN);
                         <select name="form_type" class="form-select"
                             onchange="this.form.submit()">
                             <option value="">ทั้งหมด</option>
-                            <option value="classroom" <?= $form_type === 'classroom' ? 'selected' : '' ?>>ชั้นเรียน</option>
+                            <option value="classroom" <?= $form_type === 'classroom' ? 'selected' : '' ?>>Classroom</option>
                             <option value="quickwin" <?= $form_type === 'quickwin' ? 'selected' : '' ?>>Quick Win</option>
                         </select>
                     </div>
@@ -460,6 +460,20 @@ $academicYears = $yearStmt->fetchAll(PDO::FETCH_COLUMN);
     endif;
     ?>
 
+    <?php if (!empty($_SESSION['flash_message'])): ?>
+        <script>
+            Swal.fire({
+                icon: '<?= $_SESSION['flash_type'] ?>',
+                title: 'สำเร็จ',
+                text: '<?= addslashes($_SESSION['flash_message']) ?>',
+                confirmButtonColor: '#198754'
+            });
+        </script>
+    <?php
+        // ⭐ สำคัญ: ล้าง flash ตรงนี้
+        unset($_SESSION['flash_message'], $_SESSION['flash_type']);
+    endif;
+    ?>
 
 </body>
 

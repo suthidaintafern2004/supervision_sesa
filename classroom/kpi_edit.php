@@ -279,6 +279,15 @@ $existing_images_db = $stmt->fetchAll(PDO::FETCH_ASSOC);
             border-color: #0d6efd;
             box-shadow: 0 0 0 .2rem rgba(13, 110, 253, .15);
         }
+
+        .btn-cancel {
+            background-color: #c82333;
+            color: white;
+        }
+
+        .btn-cancel:hover {
+            background-color: #a71d2a;
+        }
     </style>
 </head>
 
@@ -470,17 +479,17 @@ $existing_images_db = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 <!-- บันทึก -->
                 <?php if ($isAdmin): ?>
                     <button type="button"
-                        class="btn btn-modern btn-save shadow"
+                        class="btn btn-success btn-lg shadow"
                         onclick="confirmSave()">
-                        <i class="fas fa-save"></i> บันทึกการแก้ไข
+                        <i class="fas fa-save"></i> บันทึก
                     </button>
                 <?php endif; ?>
 
                 <!-- ยกเลิก -->
                 <button type="button"
-                    class="btn btn-modern btn-cancel shadow"
+                    class="btn btn-danger btn-lg shadow"
                     onclick="window.location.href='<?= htmlspecialchars($_SERVER['HTTP_REFERER'] ?? '../index.php') ?>'">
-                    <i class="fas fa-arrow-left"></i> กลับหน้าที่แล้ว
+                    <i class="fas fa-arrow-left me-1"></i> ยกเลิก
                 </button>
 
             </div>
