@@ -1,7 +1,5 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once '../config/session_config.php';
 
 $isAdmin = ($_SESSION['role'] ?? '') === 'admin';
 $supervisor_id = $_SESSION['user_id'] ?? null;

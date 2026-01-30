@@ -1,6 +1,6 @@
 <?php
 // supervision_start.php
-session_start();
+require_once 'config/session_config.php';
 // ตรวจสิทธิ์: ถ้าไม่ล็อกอิน ให้ไปหน้า login
 if (!isset($_SESSION['is_logged_in']) || $_SESSION['is_logged_in'] !== true) {
     // แสดงลิงก์ไปหน้า login (ไม่ใช้ die() แบบดิบเพื่อ UX ที่ดีกว่า)

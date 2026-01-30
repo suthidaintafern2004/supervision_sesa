@@ -6,10 +6,7 @@
 
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
-
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . '/config/session_config.php';
 
 /* =========================
    AUTH
@@ -447,34 +444,33 @@ $academicYears = $yearStmt->fetchAll(PDO::FETCH_COLUMN);
     <?php if (!empty($_SESSION['flash_message']) && !empty($_SESSION['flash_once'])): ?>
         <script>
             document.addEventListener('DOMContentLoaded', function() {
-                Swal.fire({
-                    icon: '<?= $_SESSION['flash_type'] ?? 'success' ?>',
-                    title: 'แจ้งเตือน',
-                    text: '<?= addslashes($_SESSION['flash_message']) ?>',
-                    confirmButtonColor: '#dc3545'
-                });
+                // 1. ตรวจสอบพารามิเตอร์ success จาก URL (เช่น ?success=update หรือ ?success=delete)
+                const urlParams = new URLSearchParams(window.location.search);
+                const successStatus = urlParams.get('success');
+
+                <?php if (!empty($_SESSION['flash_message'])): ?>
+                    // 2. แสดงป๊อปอัปเฉพาะเมื่อมีพารามิเตอร์ success ยืนยันใน URL เท่านั้น
+                    if (successStatus === 'update' || successStatus === 'delete' || successStatus === 'save') {
+                        Swal.fire({
+                            icon: '<?= $_SESSION['flash_type'] ?? 'success' ?>',
+                            title: 'ดำเนินการสำเร็จ',
+                            text: '<?= addslashes($_SESSION['flash_message']) ?>',
+                            confirmButtonColor: '#198754'
+                        }).then(() => {
+                            // 3. ล้างพารามิเตอร์บน URL ออกหลังกด OK เพื่อป้องกันการ Refresh แล้วเด้งซ้ำ
+                            const newUrl = window.location.pathname;
+                            window.history.replaceState({}, document.title, newUrl);
+                        });
+                    }
+
+                    <?php
+                    // ล้างค่า Session ทันทีเพื่อไม่ให้ค้างไปหน้าอื่น
+                    unset($_SESSION['flash_message'], $_SESSION['flash_type']);
+                    ?>
+                <?php endif; ?>
             });
         </script>
-    <?php
-        unset($_SESSION['flash_message'], $_SESSION['flash_type'], $_SESSION['flash_once']);
-    endif;
-    ?>
-
-    <?php if (!empty($_SESSION['flash_message'])): ?>
-        <script>
-            Swal.fire({
-                icon: '<?= $_SESSION['flash_type'] ?>',
-                title: 'สำเร็จ',
-                text: '<?= addslashes($_SESSION['flash_message']) ?>',
-                confirmButtonColor: '#198754'
-            });
-        </script>
-    <?php
-        // ⭐ สำคัญ: ล้าง flash ตรงนี้
-        unset($_SESSION['flash_message'], $_SESSION['flash_type']);
-    endif;
-    ?>
-
+    <?php endif; ?>
 </body>
 
 </html>

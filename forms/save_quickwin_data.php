@@ -4,9 +4,8 @@
    รองรับ Quick Win + อัปโหลดรูป
    ================================================== */
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+// 1. เรียกใช้การตั้งค่า Session 5 ชั่วโมงก่อนสิ่งอื่นใด
+require_once __DIR__ . '/../config/session_config.php';
 
 /* =========================
    เชื่อมต่อฐานข้อมูล

@@ -2,13 +2,11 @@
 // ===========================================
 // save_kpi_data.php (AJAX VERSION)
 // ===========================================
-header('Content-Type: application/json'); // กำหนดให้ส่งค่ากลับเป็น JSON
+header('Content-Type: application/json');
+require_once __DIR__ . '/config/session_config.php'; // กำหนดให้ส่งค่ากลับเป็น JSON
 error_reporting(E_ALL);
 ini_set('display_errors', 0); // ปิดการแสดง error โดยตรงเพื่อไม่ให้ขัดขวาง JSON
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
 
 if (!isset($_SESSION['user_id'])) {
     echo json_encode(['status' => 'error', 'message' => 'Unauthorized']);

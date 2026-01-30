@@ -9,8 +9,8 @@ error_reporting(E_ALL);
  * ตัวกลางเตรียมข้อมูลการนิเทศ (Controller)
  *************************************************/
 
-session_start();
 require_once 'config/db_connect.php';
+require_once 'config/session_config.php';
 
 /* =====================================================
  A) รับ flash message (ถ้ามี)

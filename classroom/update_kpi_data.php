@@ -1,6 +1,10 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
+// 1. เรียกใช้การตั้งค่า Session 5 ชั่วโมง (ถอยออกไป 1 ชั้น)
+require_once '../config/session_config.php';
+
+// 2. ตรวจเช็คสิทธิ์การเข้าใช้งาน
+if (empty($_SESSION['user_id'])) {
+    die('Session หมดอายุ ไม่สามารถบันทึกการแก้ไขได้ กรุณาล็อกอินใหม่อีกครั้ง');
 }
 
 require_once '../config/db_connect.php';

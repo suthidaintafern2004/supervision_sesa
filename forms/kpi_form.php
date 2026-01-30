@@ -1,6 +1,7 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) {
-  session_start();
+// เรียกใช้ไฟล์ตั้งค่า Session 5 ชั่วโมง (ถอยออกไป 1 ชั้น)
+if (file_exists('../config/session_config.php')) {
+  require_once '../config/session_config.php';
 }
 
 function getAcademicYear($date = null)
