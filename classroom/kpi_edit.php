@@ -173,7 +173,7 @@ $indicator_suggestions = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
    รูปภาพเดิม
 ================================ */
 $sqlImg = "
-SELECT file_name
+SELECT id, file_name, academic_year, form_type
 FROM images
 WHERE teacher_t_pid = ?
   AND subject_code = ?
@@ -303,6 +303,8 @@ $existing_images_db = $stmt->fetchAll(PDO::FETCH_ASSOC);
             <input type="hidden" name="old_subject_code" value="<?= $session_data['subject_code'] ?>">
             <input type="hidden" name="old_inspection_time" value="<?= $session_data['inspection_time'] ?>">
             <input type="hidden" name="old_supervisor_p_id" value="<?= $session_data['supervisor_p_id'] ?>">
+            <input type="hidden" name="academic_year_hidden" value="<?= htmlspecialchars($session_data['academic_year']) ?>">
+            <input type="hidden" name="form_type" value="cr">
 
             <!-- ===== ส่วนครู / ศน. ===== -->
             <div class="card shadow-sm border-0 mb-4 rounded-4">
@@ -391,6 +393,22 @@ $existing_images_db = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                 required>
                         </div>
 
+                        <!-- ภาคเรียน -->
+                        <div class="col-md-2">
+                            <label class="fw-bold">ภาคเรียน</label>
+
+                            <?php if ($isAdmin): ?>
+                                <select name="semester" class="form-select modern-input" required>
+                                    <option value="1" <?= ($session_data['semester'] == 1) ? 'selected' : '' ?>>ภาคเรียนที่ 1</option>
+                                    <option value="2" <?= ($session_data['semester'] == 2) ? 'selected' : '' ?>>ภาคเรียนที่ 2</option>
+                                </select>
+                            <?php else: ?>
+                                <div class="form-control modern-input bg-light">
+                                    ภาคเรียนที่ <?= htmlspecialchars($session_data['semester']) ?>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+
                         <!-- ปีการศึกษา -->
                         <div class="col-md-2">
                             <label class="fw-bold">ปีการศึกษา</label>
@@ -464,8 +482,18 @@ $existing_images_db = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         <?php foreach ($existing_images_db as $img): ?>
                             <div class="img-item existing-img">
                                 <img src="../uploads/<?= htmlspecialchars($img['file_name']) ?>" class="kpi-image">
-                                <input type="hidden" name="existing_images[]" value="<?= htmlspecialchars($img['file_name']) ?>">
-                                <button type="button" class="btn-remove-custom" onclick="this.parentElement.remove()">×</button>
+
+                                <input type="hidden" name="existing_images[<?= $img['id'] ?>][file_name]"
+                                    value="<?= htmlspecialchars($img['file_name']) ?>">
+
+                                <input type="hidden" name="existing_images[<?= $img['id'] ?>][academic_year]"
+                                    value="<?= htmlspecialchars($img['academic_year']) ?>">
+
+                                <input type="hidden" name="existing_images[<?= $img['id'] ?>][form_type]"
+                                    value="<?= htmlspecialchars($img['form_type']) ?>">
+
+                                <button type="button" class="btn-remove-custom"
+                                    onclick="this.parentElement.remove()">×</button>
                             </div>
                         <?php endforeach; ?>
                     </div>

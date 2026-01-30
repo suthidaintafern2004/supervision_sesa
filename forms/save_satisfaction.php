@@ -1,4 +1,5 @@
 <?php
+
 /*************************************************
  * save_satisfaction.php
  * FINAL – Normal + Quickwin + Academic Year
@@ -58,7 +59,7 @@ try {
         $c = [
             's_pid'    => $_POST['s_pid'] ?? null,
             't_pid'    => $_POST['t_pid'] ?? null,
-            'sub_code' => $_POST['sub_code'] ?? null,
+            'sub_code' => trim($_POST['sub_code'] ?? ''),
             'time'     => $_POST['time'] ?? null,
         ];
 
@@ -68,7 +69,7 @@ try {
             }
         }
 
-        /* === ดึง supervision_date === */
+        /* === 1) ดึง supervision_date ก่อน === */
         $stmt = $conn->prepare("
             SELECT supervision_date
             FROM supervision_sessions
@@ -76,7 +77,6 @@ try {
               AND teacher_t_pid   = ?
               AND subject_code    = ?
               AND inspection_time = ?
-              AND deleted_at IS NULL
             LIMIT 1
         ");
         $stmt->execute([
@@ -91,14 +91,15 @@ try {
             throw new Exception('ไม่พบข้อมูลการนิเทศ');
         }
 
+        /* === 2) คำนวณปีการศึกษา === */
         $academic_year = getAcademicYearFromDate($row['supervision_date']);
 
-        /* === INSERT คะแนน (ใส่ academic_year) === */
+        /* === 3) INSERT คะแนน (พร้อมวันเวลา) === */
         $stmt = $conn->prepare("
             INSERT INTO satisfaction_answers
             (supervisor_p_id, teacher_t_pid, subject_code, inspection_time,
-             question_id, rating, academic_year)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+             question_id, rating, academic_year, satisfaction_date)
+            VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
         ");
 
         foreach ($ratings as $qid => $score) {
@@ -113,18 +114,20 @@ try {
             ]);
         }
 
-        /* === update supervision_sessions === */
+        /* === 4) UPDATE supervision_sessions (ข้อเสนอแนะ + flag) === */
         $stmt = $conn->prepare("
             UPDATE supervision_sessions
-            SET satisfaction_submitted = 1,
-                satisfaction_date = NOW(),
-                academic_year = ?
+            SET satisfaction_suggestion = ?,
+                satisfaction_submitted  = 1,
+                satisfaction_date       = NOW(),
+                academic_year           = ?
             WHERE supervisor_p_id = ?
               AND teacher_t_pid   = ?
               AND subject_code    = ?
               AND inspection_time = ?
         ");
         $stmt->execute([
+            $suggestion,
             $academic_year,
             $c['s_pid'],
             $c['t_pid'],
@@ -147,11 +150,11 @@ try {
         /* === คำนวณปีการศึกษา === */
         $academic_year = getAcademicYearFromDate($c['date']);
 
-        /* === INSERT คะแนน (ใส่ academic_year) === */
+        /* === INSERT คะแนน (พร้อมวันเวลา) === */
         $stmt = $conn->prepare("
             INSERT INTO quickwin_satisfaction_answers
-            (t_pid, p_id, supervision_date, question_id, rating, academic_year)
-            VALUES (?, ?, ?, ?, ?, ?)
+            (t_pid, p_id, supervision_date, question_id, rating, academic_year, satisfaction_date)
+            VALUES (?, ?, ?, ?, ?, ?, NOW())
         ");
 
         foreach ($ratings as $qid => $score) {
@@ -165,17 +168,19 @@ try {
             ]);
         }
 
-        /* === update quick_win === */
+        /* === UPDATE quick_win === */
         $stmt = $conn->prepare("
             UPDATE quick_win
-            SET satisfaction_submitted = 1,
-                satisfaction_date = NOW(),
-                academic_year = ?
+            SET satisfaction_suggestion = ?,
+                satisfaction_submitted  = 1,
+                satisfaction_date       = NOW(),
+                academic_year           = ?
             WHERE t_pid = ?
               AND p_id  = ?
               AND supervision_date = ?
         ");
         $stmt->execute([
+            $suggestion,
             $academic_year,
             $c['t_pid'],
             $c['p_id'],
@@ -187,7 +192,6 @@ try {
 
     header('Location: ../session_details.php?teacher_pid=' . urlencode($c['t_pid']) . '&success=1');
     exit;
-
 } catch (Exception $e) {
     $conn->rollBack();
     error_log($e->getMessage());

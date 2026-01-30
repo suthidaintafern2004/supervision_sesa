@@ -273,78 +273,37 @@ foreach ($result as $row) {
 
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-  // Validation เดิมของคุณ
-  const totalQuestions = <?php echo $total_questions_count; ?>;
-  async function validateKpiForm() {
-    const timeVal = document.getElementById('inspection_time').value;
+  let formChanged = false;
 
-    const timeSelect = document.getElementById('inspection_time');
-    if (!timeSelect.value) {
-      Swal.fire('ครั้งที่นิเทศ', 'กรุณาเลือกครั้งที่นิเทศ', 'warning');
-      return false;
+  // ตรวจจับการเปลี่ยนแปลงในฟอร์ม
+  document.querySelectorAll('#mainForm input, #mainForm textarea, #mainForm select').forEach(el => {
+    el.addEventListener('change', () => {
+      formChanged = true;
+    });
+  });
+
+  async function submitKpiForm() {
+    const subjectCode = document.getElementById('subject_code').value.trim();
+    const subjectName = document.getElementById('subject_name').value.trim();
+    const timeVal = document.getElementById('inspection_time').value;
+    const semester = document.getElementById('semester').value;
+    const totalQuestions = <?= $total_questions_count ?>;
+
+    // Validation เบื้องต้น
+    if (!subjectCode || !subjectName || !timeVal || !semester) {
+      Swal.fire('ข้อมูลไม่ครบ', 'กรุณากรอก รหัสวิชา, ชื่อวิชา, ครั้งที่ และภาคเรียน ให้ครบถ้วน', 'warning');
+      return;
     }
 
     const checkedRadios = document.querySelectorAll('input[type="radio"]:checked');
     if (checkedRadios.length < totalQuestions) {
-      Swal.fire('ข้อมูลไม่ครบ', `กรุณาตอบคำถามให้ครบทุกข้อ`, 'warning');
-      return false;
-    }
-
-    const confirm = await Swal.fire({
-      title: 'ยืนยันการบันทึก?',
-      text: "คุณกำลังจะบันทึกการนิเทศครั้งที่ " + timeVal,
-      icon: 'question',
-      showCancelButton: true,
-      confirmButtonText: 'ตกลง',
-      cancelButtonText: 'ยกเลิก'
-    });
-
-    return confirm.isConfirmed;
-  }
-
-  // รักษาฟังก์ชัน Scroll และ Image Preview เดิม
-  function scrollToTop() {
-    window.scrollTo({
-      top: 0,
-      behavior: 'smooth'
-    });
-  }
-  window.onscroll = function() {
-    const btn = document.getElementById('scrollToTopBtn');
-    if (document.body.scrollTop > 100 || document.documentElement.scrollTop > 100) btn.style.display = "block";
-    else btn.style.display = "none";
-  };
-
-  async function submitKpiForm() {
-
-    const subjectName = document.getElementById('subject_name').value.trim();
-    const subjectCode = document.getElementById('subject_code').value.trim();
-    const timeVal = document.getElementById('inspection_time').value;
-
-    if (!subjectCode) {
-      Swal.fire('ข้อมูลไม่ครบ', 'กรุณากรอกรหัสวิชา', 'warning');
-      return;
-    }
-
-    if (!subjectName) {
-      Swal.fire('ข้อมูลไม่ครบ', 'กรุณากรอกชื่อวิชา', 'warning');
-      return;
-    }
-
-    if (!timeVal) {
-      Swal.fire('ครั้งที่นิเทศ', 'กรุณาเลือกครั้งที่นิเทศ', 'warning');
-      return;
-    }
-
-    const checkedRadios = document.querySelectorAll('input[type="radio"]:checked');
-    if (checkedRadios.length < <?= $total_questions_count ?>) {
-      Swal.fire('ข้อมูลไม่ครบ', 'กรุณาตอบคำถามให้ครบทุกข้อ', 'warning');
+      Swal.fire('ข้อมูลไม่ครบ', 'กรุณาตอบคำถาม KPI ให้ครบทุกข้อ', 'warning');
       return;
     }
 
     const confirm = await Swal.fire({
       title: 'ยืนยันการบันทึก?',
-      text: 'คุณกำลังจะบันทึกข้อมูลการนิเทศ',
+      text: 'คุณกำลังจะบันทึกข้อมูลการนิเทศครั้งที่ ' + timeVal,
       icon: 'question',
       showCancelButton: true,
       confirmButtonText: 'ตกลง',
@@ -352,84 +311,84 @@ foreach ($result as $row) {
     });
 
     if (confirm.isConfirmed) {
-      document.getElementById('mainForm').submit();
+      // แสดง Loading ระหว่างส่งข้อมูล
+      Swal.fire({
+        title: 'กำลังบันทึก...',
+        allowOutsideClick: false,
+        didOpen: () => {
+          Swal.showLoading();
+        }
+      });
+
+      const formData = new FormData(document.getElementById('mainForm'));
+
+      try {
+        const response = await fetch('save_kpi_data.php', {
+          method: 'POST',
+          body: formData
+        });
+
+        const result = await response.json();
+
+        if (result.status === 'duplicate') {
+          // กรณีข้อมูลซ้ำ: แจ้งเตือนแต่ไม่ล้างค่า
+          Swal.fire({
+            title: result.title,
+            text: result.text,
+            icon: result.icon
+          });
+        } else if (result.status === 'success') {
+          // กรณีสำเร็จ: แจ้งเตือนแล้วย้ายหน้า
+          formChanged = false;
+          Swal.fire('สำเร็จ', result.message, 'success').then(() => {
+            window.location.href = 'index.php';
+          });
+        } else {
+          Swal.fire('เกิดข้อผิดพลาด', result.message, 'error');
+        }
+      } catch (error) {
+        console.error('Error:', error);
+        Swal.fire('ข้อผิดพลาด', 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้', 'error');
+      }
     }
   }
 
+  // ฟังก์ชันพรีวิวรูปภาพ (คงเดิม)
   function handleFiles(input) {
     const preview = document.getElementById('previewContainer');
-    preview.innerHTML = ''; // ล้าง preview เดิม
-
+    preview.innerHTML = '';
     const files = Array.from(input.files);
-
     if (files.length > 2) {
       Swal.fire('จำกัดรูปภาพ', 'อัปโหลดได้ไม่เกิน 2 รูป', 'warning');
       input.value = '';
       return;
     }
-
     files.forEach(file => {
-      if (!file.type.startsWith('image/')) return;
-
       const reader = new FileReader();
-
       reader.onload = e => {
-        const wrapper = document.createElement('div');
-        wrapper.className = 'position-relative';
-
-        const img = document.createElement('img');
-        img.src = e.target.result;
-        img.style.width = '160px';
-        img.style.height = 'auto';
-        img.className = 'rounded shadow border';
-
-        // ปุ่มลบรูป
-        const removeBtn = document.createElement('button');
-        removeBtn.type = 'button';
-        removeBtn.innerHTML = '&times;';
-        removeBtn.className = 'btn btn-danger btn-sm position-absolute top-0 end-0';
-        removeBtn.onclick = () => {
-          input.value = '';
-          preview.innerHTML = '';
-        };
-
-        wrapper.appendChild(img);
-        wrapper.appendChild(removeBtn);
-        preview.appendChild(wrapper);
+        const div = document.createElement('div');
+        div.className = 'position-relative';
+        div.innerHTML = `<img src="${e.target.result}" style="width:160px" class="rounded shadow border">`;
+        preview.appendChild(div);
       };
-
       reader.readAsDataURL(file);
     });
   }
 
-  let formChanged = false;
-
-  // ตรวจว่ามีการแก้ไขฟอร์มหรือยัง
-  document.querySelectorAll('#mainForm input, #mainForm textarea, #mainForm select')
-    .forEach(el => {
-      el.addEventListener('change', () => {
-        formChanged = true;
-      });
-    });
-
   function confirmBack() {
     if (!formChanged) {
-      // ยังไม่ได้แก้ไขอะไร
-      window.location.href = 'index.php'; // 👈 หน้า list / admin
+      window.location.href = 'index.php';
       return;
     }
-
     Swal.fire({
       title: 'คุณยังไม่ได้บันทึกข้อมูล',
-      text: 'หากย้อนกลับ ข้อมูลที่กรอกจะหายทั้งหมด',
+      text: 'หากย้อนกลับ ข้อมูลจะหายทั้งหมด',
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'ย้อนกลับ',
       cancelButtonText: 'อยู่หน้านี้'
     }).then(result => {
-      if (result.isConfirmed) {
-        window.location.href = 'index.php'; // 👈 หน้า list / admin
-      }
+      if (result.isConfirmed) window.location.href = 'index.php';
     });
   }
 </script>

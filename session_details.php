@@ -182,169 +182,190 @@ try {
             background-color: #ffc107;
             color: black;
         }
+
+        /* การปรับแต่งสำหรับ Mobile */
+        @media (max-width: 768px) {
+            .container {
+                padding-left: 10px;
+                padding-right: 10px;
+            }
+
+            .card {
+                padding: 15px !important;
+            }
+
+            .card-title {
+                font-size: 1.25rem;
+            }
+
+            /* ปรับขนาดตัวอักษรในตาราง */
+            .table {
+                font-size: 0.85rem;
+            }
+
+            .table th,
+            .table td {
+                padding: 8px 4px !important;
+            }
+
+            /* ปรับปุ่มให้เล็กลงพอดีกับจอ */
+            .btn-group .btn {
+                padding: .25rem .4rem;
+                font-size: .75rem;
+                margin-bottom: 2px;
+            }
+
+            .btn-group {
+                display: flex;
+                flex-direction: column;
+                /* เรียงปุ่มแนวตั้งบนมือถือเพื่อประหยัดความกว้าง */
+            }
+
+            .btn-group form {
+                display: block;
+                width: 100%;
+            }
+        }
     </style>
 </head>
 
 <body>
-    <div class="container mt-5">
+    <div class="container mt-3 mt-md-5">
         <div class="card shadow-lg p-4">
             <h2 class="card-title text-center mb-4">
-                <i class="fas fa-user-clock"></i> รายละเอียดประวัติการนิเทศ
+                <i class="fas fa-user-clock text-primary"></i> รายละเอียดประวัติการนิเทศ
             </h2>
 
             <?php if (!empty($academic_year)): ?>
-                <div class="alert alert-info text-center fw-bold mb-3">
-                    แสดงข้อมูลปีการศึกษา <?= htmlspecialchars($academic_year) ?>
+                <div class="alert alert-info text-center fw-bold mb-3 py-2">
+                    ปีการศึกษา <?= htmlspecialchars($academic_year) ?>
                 </div>
             <?php endif; ?>
 
             <div class="card mb-4 border-primary">
-                <div class="card-body bg-light">
-                    <div class="row">
-                        <div class="col-md-6 mb-2">
-                            <strong>ผู้รับการนิเทศ:</strong>
-                            <?php echo htmlspecialchars($teacher_info['teacher_full_name']); ?>
+                <div class="card-body bg-light p-3">
+                    <div class="row g-2">
+                        <div class="col-12 col-md-6">
+                            <strong>ผู้รับการนิเทศ:</strong> <?php echo htmlspecialchars($teacher_info['teacher_full_name']); ?>
                         </div>
-                        <div class="col-md-6 mb-2">
-                            <strong>โรงเรียน:</strong>
-                            <?php echo htmlspecialchars($teacher_info['SchoolName']); ?>
+                        <div class="col-12 col-md-6">
+                            <strong>โรงเรียน:</strong> <?php echo htmlspecialchars($teacher_info['SchoolName']); ?>
                         </div>
-                        <div class="col-md-6 mb-2">
-                            <strong>ตำแหน่ง:</strong>
-                            <?php echo htmlspecialchars($teacher_info['teacher_position']); ?>
+                        <div class="col-12 col-md-6">
+                            <strong>ตำแหน่ง:</strong> <?php echo htmlspecialchars($teacher_info['teacher_position']); ?>
                         </div>
-                        <div class="col-md-6 mb-2">
-                            <strong>กลุ่มสาระฯ:</strong>
-                            <?php echo htmlspecialchars($teacher_info['subjectgroup_name'] ?? '-'); ?>
+                        <div class="col-12 col-md-6">
+                            <strong>กลุ่มสาระ:</strong> <?php echo htmlspecialchars($teacher_info['subjectgroup_name'] ?? '-'); ?>
                         </div>
                     </div>
                 </div>
             </div>
 
             <div class="table-responsive">
-                <table class="table table-striped table-hover align-middle">
-                    <thead class="table-primary">
-                        <tr class="text-center">
-                            <th style="width: 15%;">วันที่</th>
-                            <th style="width: 10%;">ประเภท</th>
-                            <th style="width: 25%;" class="text-center">หัวข้อ / วิชา</th>
-                            <th style="width: 20%;">ผู้นิเทศ</th>
-                            <th style="width: 30%;">การดำเนินการ</th>
+                <table class="table table-bordered table-hover align-middle">
+                    <thead class="table-primary text-center">
+                        <tr>
+                            <th>วันที่/เวลา</th>
+                            <th>ประเภท</th>
+                            <th>หัวข้อ / วิชา</th>
+                            <th>ผู้นิเทศก์</th>
+                            <th>จัดการ</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php if (empty($results)) : ?>
                             <tr>
                                 <td colspan="5" class="text-center text-danger fw-bold p-4">
-                                    ไม่พบประวัติการนิเทศสำหรับครูท่านนี้
+                                    ไม่พบประวัติการนิเทศ
                                 </td>
                             </tr>
                         <?php else : ?>
                             <?php foreach ($results as $row) : ?>
                                 <tr>
-                                    <td class="text-center">
-                                        <?php echo (new DateTime($row['supervision_date']))->format('d/m/Y H:i'); ?> น.
+                                    <td class="text-center" style="min-width: 90px;">
+                                        <?php echo (new DateTime($row['supervision_date']))->format('d/m/y'); ?><br>
+                                        <small class="text-muted"><?php echo (new DateTime($row['supervision_date']))->format('H:i'); ?> น.</small>
                                     </td>
 
-                                    <td class="text-center">
+                                    <td class="text-center" style="min-width: 100px;">
                                         <?php if ($row['session_type'] === 'normal'): ?>
-                                            <span class="badge badge-normal">นิเทศ</span><br>
-                                            <small class="text-muted">ครั้งที่ <?php echo $row['time_info']; ?></small>
+                                            <span class="badge badge-normal">นิเทศห้เรียน</span>
+                                            <?php if ($row['time_info']): ?><br><small>ครั้งที่ <?php echo $row['time_info']; ?></small><?php endif; ?>
                                         <?php else: ?>
-                                            <span class="badge badge-qw">จุดเน้น (Quick Win)</span>
+                                            <span class="badge badge-qw">Quick Win</span>
                                         <?php endif; ?>
                                     </td>
 
-                                    <td class="text-center">
-                                        <?php echo htmlspecialchars($row['topic'] ?? ''); ?>
+                                    <td>
+                                        <div class="text-wrap" style="min-width: 120px;">
+                                            <?php echo htmlspecialchars($row['topic'] ?? ''); ?>
+                                        </div>
                                     </td>
 
                                     <td>
-                                        <?php echo htmlspecialchars($row['supervisor_full_name']); ?>
+                                        <small><?php echo htmlspecialchars($row['supervisor_full_name']); ?></small>
                                     </td>
 
-                                    <td class="text-center">
-                                        <?php if ($row['session_type'] === 'normal'): ?>
-                                            <div class="btn-group" role="group">
-                                                <form method="POST" action="supervision_report.php" style="display:inline;" target="_blank">
+                                    <td class="text-center" style="min-width: 110px;">
+                                        <div class="btn-group" role="group">
+                                            <?php
+                                            $report_action = ($row['session_type'] === 'normal') ? 'supervision_report.php' : 'quickwin_report.php';
+                                            $t_id_val = ($row['session_type'] === 'normal') ? $row['teacher_t_pid'] : $row['qw_t_id'];
+                                            $p_id_val = ($row['session_type'] === 'normal') ? $row['supervisor_p_id'] : $row['qw_p_id'];
+                                            ?>
+                                            <form method="POST" action="<?= $report_action ?>" style="display:inline;" target="_blank">
+                                                <?php if ($row['session_type'] === 'normal'): ?>
                                                     <input type="hidden" name="s_pid" value="<?php echo $row['supervisor_p_id']; ?>">
                                                     <input type="hidden" name="t_pid" value="<?php echo $row['teacher_t_pid']; ?>">
                                                     <input type="hidden" name="sub_code" value="<?php echo $row['subject_code']; ?>">
                                                     <input type="hidden" name="time" value="<?php echo $row['inspection_time']; ?>">
-                                                    <button type="submit" class="btn btn-sm btn-info text-white">
-                                                        <i class="fas fa-file-alt"></i> รายงาน
-                                                    </button>
-                                                </form>
-
-                                                <?php if (!$is_supervisor): ?>
-                                                    <?php if ($row['status'] == 0): ?>
-                                                        <form method="POST" action="forms/satisfaction_form.php" style="display:inline;">
-                                                            <input type="hidden" name="mode" value="normal">
-                                                            <input type="hidden" name="s_pid" value="<?php echo $row['supervisor_p_id']; ?>">
-                                                            <input type="hidden" name="t_pid" value="<?php echo $row['teacher_t_pid']; ?>">
-                                                            <input type="hidden" name="sub_code" value="<?php echo $row['subject_code']; ?>">
-                                                            <input type="hidden" name="time" value="<?php echo $row['inspection_time']; ?>">
-                                                            <button type="submit" class="btn btn-sm btn-warning">
-                                                                <i class="fas fa-star"></i> ประเมิน
-                                                            </button>
-                                                        </form>
-                                                    <?php else: ?>
-                                                        <form method="POST" action="certificate.php" style="display:inline;" target="_blank">
-                                                            <input type="hidden" name="s_pid" value="<?php echo $row['supervisor_p_id']; ?>">
-                                                            <input type="hidden" name="t_pid" value="<?php echo $row['teacher_t_pid']; ?>">
-                                                            <input type="hidden" name="sub_code" value="<?php echo $row['subject_code']; ?>">
-                                                            <input type="hidden" name="time" value="<?php echo $row['inspection_time']; ?>">
-                                                            <button type="submit" class="btn btn-sm btn-success">
-                                                                <i class="fas fa-certificate"></i> เกียรติบัตร
-                                                            </button>
-                                                        </form>
-                                                    <?php endif; ?>
-                                                <?php endif; ?>
-                                            </div>
-
-                                        <?php else: ?>
-                                            <div class="btn-group" role="group">
-
-                                                <form method="POST" action="quickwin_report.php" style="display:inline;" target="_blank">
+                                                <?php else: ?>
                                                     <input type="hidden" name="t_id" value="<?php echo $row['qw_t_id']; ?>">
                                                     <input type="hidden" name="p_id" value="<?php echo $row['qw_p_id']; ?>">
                                                     <input type="hidden" name="date" value="<?php echo $row['qw_date']; ?>">
-                                                    <button type="submit" class="btn btn-sm btn-info text-white">
-                                                        <i class="fas fa-file-alt"></i> รายงาน
-                                                    </button>
-                                                </form>
+                                                <?php endif; ?>
+                                                <button type="submit" class="btn btn-sm btn-info text-white w-100">
+                                                    <i class="fas fa-file-alt"></i> รายงาน
+                                                </button>
+                                            </form>
 
-                                                <?php if (!$is_supervisor): ?>
-
-                                                    <?php if ($row['status'] == 0): ?>
-                                                        <!-- ยังไม่ประเมิน -->
-                                                        <form method="POST" action="forms/satisfaction_form.php" style="display:inline;">
-                                                            <input type="hidden" name="mode" value="quickwin">
-                                                            <input type="hidden" name="t_pid" value="<?php echo $row['qw_t_id']; ?>">
+                                            <?php if (!$is_supervisor): ?>
+                                                <?php if ($row['status'] == 0): ?>
+                                                    <form method="POST" action="forms/satisfaction_form.php" style="display:inline;">
+                                                        <input type="hidden" name="mode" value="<?= $row['session_type'] ?>">
+                                                        <input type="hidden" name="t_pid" value="<?= $t_id_val ?>">
+                                                        <?php if ($row['session_type'] === 'normal'): ?>
+                                                            <input type="hidden" name="s_pid" value="<?php echo $row['supervisor_p_id']; ?>">
+                                                            <input type="hidden" name="sub_code" value="<?php echo $row['subject_code']; ?>">
+                                                            <input type="hidden" name="time" value="<?php echo $row['inspection_time']; ?>">
+                                                        <?php else: ?>
                                                             <input type="hidden" name="p_id" value="<?php echo $row['qw_p_id']; ?>">
                                                             <input type="hidden" name="date" value="<?php echo $row['qw_date']; ?>">
-                                                            <button type="submit" class="btn btn-sm btn-warning">
-                                                                <i class="fas fa-star"></i> ประเมินจุดเน้น
-                                                            </button>
-                                                        </form>
-
-
-                                                    <?php else: ?>
-                                                        <!-- ประเมินแล้ว -->
-                                                        <form method="POST" action="certificate_quickwin.php" style="display:inline;" target="_blank">
+                                                        <?php endif; ?>
+                                                        <button type="submit" class="btn btn-sm btn-warning w-100">
+                                                            <i class="fas fa-star"></i> ประเมิน
+                                                        </button>
+                                                    </form>
+                                                <?php else: ?>
+                                                    <?php $cert_action = ($row['session_type'] === 'normal') ? 'certificate.php' : 'certificate_quickwin.php'; ?>
+                                                    <form method="POST" action="<?= $cert_action ?>" style="display:inline;" target="_blank">
+                                                        <?php if ($row['session_type'] === 'normal'): ?>
+                                                            <input type="hidden" name="s_pid" value="<?php echo $row['supervisor_p_id']; ?>">
+                                                            <input type="hidden" name="t_pid" value="<?php echo $row['teacher_t_pid']; ?>">
+                                                            <input type="hidden" name="sub_code" value="<?php echo $row['subject_code']; ?>">
+                                                            <input type="hidden" name="time" value="<?php echo $row['inspection_time']; ?>">
+                                                        <?php else: ?>
                                                             <input type="hidden" name="t_id" value="<?php echo $row['qw_t_id']; ?>">
                                                             <input type="hidden" name="p_id" value="<?php echo $row['qw_p_id']; ?>">
                                                             <input type="hidden" name="date" value="<?php echo $row['qw_date']; ?>">
-                                                            <button type="submit" class="btn btn-sm btn-success">
-                                                                <i class="fas fa-certificate"></i> เกียรติบัตร
-                                                            </button>
-                                                        </form>
-                                                    <?php endif; ?>
-
+                                                        <?php endif; ?>
+                                                        <button type="submit" class="btn btn-sm btn-success w-100">
+                                                            <i class="fas fa-certificate"></i> เกียรติบัตร
+                                                        </button>
+                                                    </form>
                                                 <?php endif; ?>
-
-                                            </div>
-                                        <?php endif; ?>
+                                            <?php endif; ?>
+                                        </div>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -355,8 +376,8 @@ try {
 
             <div class="text-center mt-4">
                 <a href="index.php<?= !empty($academic_year) ? '?academic_year=' . urlencode($academic_year) : '' ?>"
-                    class="btn btn-danger">
-                    <i class="fas fa-chevron-left"></i> กลับไปหน้าประวัติรวม
+                    class="btn btn-secondary shadow-sm">
+                    <i class="fas fa-chevron-left"></i> กลับไปหน้าหลัก
                 </a>
             </div>
         </div>

@@ -26,7 +26,7 @@ $views = $stmt->fetchColumn();
 /* =========================
    PAGINATION
 ========================= */
-$limit  = 50;
+$limit  = 30;
 $page   = (isset($_GET['page']) && is_numeric($_GET['page'])) ? (int)$_GET['page'] : 1;
 $page   = max($page, 1);
 $offset = ($page - 1) * $limit;
@@ -280,7 +280,7 @@ try {
                                 </a>
                             </li>
                             <li>
-                                <a class="dropdown-item" href="graphs/supervisor_personal_stats_chart.php?form_type=4">
+                                <a class="dropdown-item" href="graphs/satisfaction_dashboard.php?form_type=personal">
                                     <i class="fas fa-chart-bar text-success me-2"></i> สถิติการนิเทศรายบุคคล
                                 </a>
                             </li>
@@ -385,23 +385,19 @@ try {
                         <?php else: ?>
                             <?php foreach ($results as $row): ?>
                                 <tr>
-                                    <td><?= htmlspecialchars($row['teacher_full_name']) ?></td>
-                                    <td><?= htmlspecialchars($row['t_school']) ?></td>
-                                    <td><?= htmlspecialchars($row['teacher_position']) ?></td>
-                                    <td class="text-center">
+                                    <td data-label="ชื่อผู้รับนิเทศ"><?= htmlspecialchars($row['teacher_full_name']) ?></td>
+                                    <td data-label="โรงเรียน"><?= htmlspecialchars($row['t_school']) ?></td>
+                                    <td data-label="ตำแหน่ง"><?= htmlspecialchars($row['teacher_position']) ?></td>
+                                    <td data-label="จำนวนครั้ง" class="text-center">
                                         <span class="badge bg-warning">
                                             <?= $row['count_normal'] + $row['count_quickwin'] ?>
                                         </span>
                                     </td>
-
-                                    <td class="text-center">
-                                        <form action="session_details.php" method="POST">
+                                    <td data-label="ดูข้อมูล" class="text-center">
+                                        <form action="session_details.php" method="POST" class="d-inline">
                                             <input type="hidden" name="teacher_pid" value="<?= $row['teacher_t_pid'] ?>">
-
-                                            <!-- ⭐ ส่งปีการศึกษาที่เลือกไปด้วย -->
                                             <input type="hidden" name="academic_year" value="<?= htmlspecialchars($selected_year) ?>">
-
-                                            <button class="btn btn-info btn-sm">
+                                            <button class="btn btn-info btn-sm btn-custom px-3">
                                                 <i class="fas fa-eye"></i> ดูประวัติ
                                             </button>
                                         </form>

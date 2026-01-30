@@ -81,3 +81,80 @@ footer {
     font-weight: 500;
     letter-spacing: 0.5px;
 }
+
+/* =========================
+   RESPONSIVE TABLE TO CARDS (FIXED)
+   ========================= */
+
+@media (max-width: 768px) {
+
+    /* ซ่อนหัวตารางแบบปกติ */
+    .teacher-table thead {
+        display: none;
+    }
+
+    .teacher-table,
+    .teacher-table tbody,
+    .teacher-table tr,
+    .teacher-table td {
+        display: block;
+        width: 100%;
+    }
+
+    .teacher-table tr {
+        margin-bottom: 15px;
+        border: 1px solid #eee;
+        border-radius: 15px;
+        padding: 10px;
+        background: #fff;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+    }
+
+    .teacher-table td {
+        display: flex;
+        /* ใช้ Flexbox เพื่อแยกหัวข้อกับข้อมูล */
+        justify-content: space-between;
+        /* หัวข้ออยู่ซ้าย ข้อมูลอยู่ขวา */
+        align-items: center;
+        text-align: right;
+        padding: 12px 10px;
+        border-bottom: 1px solid #f9f9f9;
+        min-height: 45px;
+    }
+
+    .teacher-table td:last-child {
+        border-bottom: 0;
+        justify-content: center;
+        /* ปุ่มดูข้อมูลให้จัดกึ่งกลางหรือขวาตามเหมาะสม */
+    }
+
+    /* จัดการหัวข้อสีส้ม (Label) */
+    .teacher-table td::before {
+        content: attr(data-label);
+        font-weight: 600;
+        text-align: left;
+        color: #ff8c42;
+        /* สีส้มตามธีมเดิม */
+        margin-right: 15px;
+        /* เว้นระยะห่างจากข้อมูล */
+        white-space: nowrap;
+        /* ป้องกันหัวข้อขึ้นบรรทัดใหม่ */
+    }
+
+    /* ปรับแต่งข้อมูลภายใน TD */
+    .teacher-table td.text-center {
+        text-align: right !important;
+        justify-content: space-between !important;
+    }
+
+    /* ปรับปุ่มในมือถือให้ใหญ่ขึ้นกดง่าย */
+    .btn-custom {
+        width: 100%;
+        margin-top: 5px;
+    }
+
+    /* กรณีที่มีฟอร์มหรือปุ่มใน TD ให้ขยายเต็มหน้าจอ */
+    .teacher-table td form {
+        width: 100%;
+    }
+}
