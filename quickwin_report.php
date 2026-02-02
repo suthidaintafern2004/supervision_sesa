@@ -107,23 +107,21 @@ try {
 // ========================
 // 3. ดึงรูปภาพประกอบ Quick Win
 // ========================
-$sql_imgs = "
-    SELECT file_name
-    FROM images
-    WHERE supervisor_p_id = :pid
-      AND teacher_t_pid = :tid
-      AND subject_code IS NULL
-      AND inspection_time IS NULL
-    ORDER BY uploaded_on ASC
-";
+$sql_images = "SELECT file_name 
+               FROM images 
+               WHERE supervisor_p_id = :p_id 
+                 AND teacher_t_pid = :t_id 
+                 AND form_type = 'qw'
+                 AND (subject_code = '' OR subject_code IS NULL)
+                 AND (inspection_time = '' OR inspection_time IS NULL)
+               ORDER BY id ASC";
 
-$stmt_imgs = $conn->prepare($sql_imgs);
-$stmt_imgs->execute([
-    ':pid' => $p_id,
-    ':tid' => $t_id
+$stmt_img = $conn->prepare($sql_images);
+$stmt_img->execute([
+    ':p_id' => $p_id,
+    ':t_id' => $t_id
 ]);
-
-$images = $stmt_imgs->fetchAll(PDO::FETCH_COLUMN);
+$images = $stmt_img->fetchAll(PDO::FETCH_ASSOC);
 ?>
 <!DOCTYPE html>
 <html lang="th">
@@ -222,7 +220,7 @@ $images = $stmt_imgs->fetchAll(PDO::FETCH_COLUMN);
                 </div>
             </div>
 
-            <?php if (!empty($info['satisfaction_suggestion'])): ?>
+            <!-- <?php if (!empty($info['satisfaction_suggestion'])): ?>
                 <div class="card mt-4 border-info">
                     <div class="card-header bg-info text-dark fw-bold">
                         <i class="fas fa-lightbulb"></i> ข้อเสนอแนะจากการประเมิน
@@ -233,7 +231,7 @@ $images = $stmt_imgs->fetchAll(PDO::FETCH_COLUMN);
                         </p>
                     </div>
                 </div>
-            <?php endif; ?>
+            <?php endif; ?> -->
 
             <?php if (!empty($images)): ?>
                 <h5 class="header-title mt-4">
@@ -244,8 +242,7 @@ $images = $stmt_imgs->fetchAll(PDO::FETCH_COLUMN);
                     <?php foreach ($images as $img): ?>
                         <div class="col-6 col-md-4">
                             <div class="card shadow-sm">
-                                <img
-                                    src="uploads/quickwin/<?php echo htmlspecialchars($img); ?>"
+                                <img src="uploads/quickwin/<?php echo htmlspecialchars($img['file_name']); ?>"
                                     class="card-img-top img-fluid"
                                     style="height: 180px; object-fit: cover; cursor: pointer;"
                                     onclick="openImage(this.src)"

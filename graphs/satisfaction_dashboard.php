@@ -15,15 +15,20 @@ $supervisor_p_id = $_SESSION['user_id'] ?? null;
 // 2. รับค่าจาก Filter
 $form_type = isset($_GET['form_type']) ? $_GET['form_type'] : '1';
 
-// --- ส่วนที่ปรับปรุง: คำนวณปีการศึกษาไทยปัจจุบัน ---
+// --- ส่วนที่ปรับปรุงใหม่ ---
 $current_year_th = (int)date("Y") + 543;
 
-// ดึงรายการปีการศึกษาทั้งหมดที่มีในฐานข้อมูล
+// 1. ดึงรายการปีการศึกษาทั้งหมดที่มีในฐานข้อมูล
 $years_sql = "SELECT academic_year FROM supervision_sessions UNION SELECT academic_year FROM quick_win ORDER BY academic_year DESC";
 $available_years = $conn->query($years_sql)->fetchAll(PDO::FETCH_COLUMN);
 
-// กำหนดค่า Default: ถ้ามีการเลือกใน Dropdown ให้ใช้ค่านั้น ถ้าไม่มีให้ใช้ปีปัจจุบัน (พ.ศ.)
-$selected_year = isset($_GET['academic_year']) ? (int)$_GET['academic_year'] : $current_year_th;
+// 2. หาปีล่าสุดที่มีข้อมูลในฐานข้อมูล (ถ้าไม่มีเลย ให้ใช้ปีปัจจุบัน)
+$latest_data_year = !empty($available_years) ? (int)$available_years[0] : $current_year_th;
+
+// 3. กำหนดค่า Default: 
+// - ถ้ามีการเลือกผ่าน Dropdown ($_GET) ให้ใช้ค่านั้น
+// - ถ้าเปิดหน้าเว็บมาครั้งแรก ให้ใช้ $latest_data_year (ปีล่าสุดที่มีข้อมูล)
+$selected_year = isset($_GET['academic_year']) ? (int)$_GET['academic_year'] : $latest_data_year;
 
 // สีพาสเทลแบบเข้ม
 $vividPastelColors = ['#FF9AA2', '#FFB7B2', '#FFDAC1', '#E2F0CB', '#B5EAD7', '#C7CEEA', '#F3B0C3', '#97C1A9', '#8FCACA', '#CCA9DD'];
@@ -213,7 +218,7 @@ try {
                         <input type="hidden" name="form_type" value="<?= $form_type ?>">
                         <select name="academic_year" class="form-select rounded-pill border-0 bg-light fw-bold shadow-sm" onchange="this.form.submit()">
                             <?php if (!in_array($current_year_th, $available_years)): ?>
-                                <option value="<?= $current_year_th ?>" <?= $selected_year == $current_year_th ? 'selected' : '' ?>>ปีการศึกษา <?= $current_year_th ?> (ปัจจุบัน)</option>
+                                <option value="<?= $current_year_th ?>" <?= $selected_year == $current_year_th ? 'selected' : '' ?>>ปีการศึกษา <?= $current_year_th ?></option>
                             <?php endif; ?>
                             <?php foreach ($available_years as $y): ?>
                                 <option value="<?= $y ?>" <?= $y == $selected_year ? 'selected' : '' ?>>ปีการศึกษา <?= $y ?></option>

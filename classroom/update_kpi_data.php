@@ -152,9 +152,9 @@ try {
     $conn->prepare("
         DELETE FROM kpi_answers
         WHERE supervisor_p_id = ?
-          AND teacher_t_pid   = ?
-          AND subject_code    = ?
-          AND inspection_time = ?
+        AND teacher_t_pid   = ?
+        AND subject_code    = ?
+        AND inspection_time = ?
     ")->execute([
         $old_supervisor_id,
         $old_t_pid,
@@ -162,10 +162,11 @@ try {
         $old_inspection_time
     ]);
 
+    // 2. Insert ใหม่ (ระบุคอลัมน์ให้ครบตามโครงสร้างตารางจริง)
     $stmtAns = $conn->prepare("
         INSERT INTO kpi_answers
-        (supervisor_p_id, teacher_t_pid, subject_code, inspection_time, question_id, rating_score)
-        VALUES (?, ?, ?, ?, ?, ?)
+        (supervisor_p_id, teacher_t_pid, subject_code, inspection_time, question_id, rating_score, academic_year, supervision_date)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     ");
 
     foreach ($ratings as $qid => $score) {
@@ -175,19 +176,22 @@ try {
             $new_subject_code,
             $new_inspection_time,
             $qid,
-            $score
+            $score,
+            $new_academic_year,  // <--- เพิ่มค่าปีการศึกษาที่นี่
+            $new_inspection_date // <--- เพิ่มค่าวันที่ที่นี่
         ]);
     }
 
     /* =====================================================
-       7) KPI INDICATOR SUGGESTIONS
+        7) KPI INDICATOR SUGGESTIONS (เพิ่มปีการศึกษา)
     ===================================================== */
+    // 1. ลบของเก่าออกก่อน
     $conn->prepare("
         DELETE FROM kpi_indicator_suggestions
         WHERE supervisor_p_id = ?
-          AND teacher_t_pid   = ?
-          AND subject_code    = ?
-          AND inspection_time = ?
+        AND teacher_t_pid   = ?
+        AND subject_code    = ?
+        AND inspection_time = ?
     ")->execute([
         $old_supervisor_id,
         $old_t_pid,
@@ -195,10 +199,11 @@ try {
         $old_inspection_time
     ]);
 
+    // 2. Insert ใหม่
     $stmtNote = $conn->prepare("
         INSERT INTO kpi_indicator_suggestions
-        (supervisor_p_id, teacher_t_pid, subject_code, inspection_time, indicator_id, suggestion_text)
-        VALUES (?, ?, ?, ?, ?, ?)
+        (supervisor_p_id, teacher_t_pid, subject_code, inspection_time, indicator_id, suggestion_text, academic_year)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
     ");
 
     foreach ($indicator_suggestions as $iid => $text) {
@@ -209,7 +214,8 @@ try {
                 $new_subject_code,
                 $new_inspection_time,
                 $iid,
-                $text
+                $text,
+                $new_academic_year // <--- เพิ่มค่าปีการศึกษาที่นี่
             ]);
         }
     }

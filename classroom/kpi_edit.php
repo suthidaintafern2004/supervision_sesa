@@ -653,13 +653,20 @@ $existing_images_db = $stmt->fetchAll(PDO::FETCH_ASSOC);
             let initialSnapshot = null;
 
             function getFormSnapshot() {
-                const data = new FormData(document.getElementById('evaluationForm'));
+                const form = document.getElementById('evaluationForm');
+                const data = new FormData(form);
                 const obj = {};
 
                 for (let [key, value] of data.entries()) {
-                    if (key === 'images[]') continue; // ไม่เช็ครูป
+                    if (key === 'images[]') {
+                        // เช็คว่ามีการเลือกไฟล์ใหม่หรือไม่
+                        obj['has_new_images'] = form.querySelector('#imageInput').files.length > 0;
+                        continue;
+                    }
                     obj[key] = value;
                 }
+                // เพิ่มการเช็คจำนวนรูปเดิมที่เหลืออยู่ด้วย
+                obj['existing_img_count'] = document.querySelectorAll('.existing-img').length;
 
                 return JSON.stringify(obj);
             }

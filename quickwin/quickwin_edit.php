@@ -168,9 +168,10 @@ $sqlImg = "
     FROM images
     WHERE supervisor_p_id = ?
       AND teacher_t_pid = ?
-      AND subject_code IS NULL
-      AND inspection_time IS NULL
-    ORDER BY uploaded_on ASC
+      AND form_type = 'qw'  -- ระบุประเภทฟอร์มให้ชัดเจน
+      AND (subject_code = '' OR subject_code IS NULL)
+      AND (inspection_time = '' OR inspection_time IS NULL)
+    ORDER BY id ASC
 ";
 
 $stmtImg = $conn->prepare($sqlImg);
@@ -322,9 +323,9 @@ $images = $stmtImg->fetchAll(PDO::FETCH_ASSOC);
                             </div>
 
                             <!-- KEY เดิม (สำหรับ WHERE ตอน UPDATE) -->
-                            <input type="hidden" name="old_t_pid" value="<?= htmlspecialchars($t_pid) ?>">
-                            <input type="hidden" name="old_p_id" value="<?= htmlspecialchars($p_id) ?>">
-                            <input type="hidden" name="old_supervision_date" value="<?= htmlspecialchars($supervision_date) ?>">
+                            <input type="hidden" name="old_t_pid" value="<?= htmlspecialchars($data['t_pid']) ?>">
+                            <input type="hidden" name="old_p_id" value="<?= htmlspecialchars($data['p_id']) ?>">
+                            <input type="hidden" name="old_supervision_date" value="<?= htmlspecialchars($data['supervision_date']) ?>">
 
 
                             <div class="mb-4">
@@ -394,8 +395,8 @@ $images = $stmtImg->fetchAll(PDO::FETCH_ASSOC);
                                     <?php foreach ($images as $img): ?>
                                         <div class="col-md-3 text-center" id="img<?= $img['id'] ?>">
                                             <img src="../uploads/quickwin/<?= htmlspecialchars($img['file_name']) ?>"
-                                                class="img-thumbnail mb-2"
-                                                style="height:120px; object-fit:cover;">
+                                                class="img-fluid rounded shadow-sm"
+                                                style="width: 100%; height: 150px; object-fit: cover;">
                                             <button type="button"
                                                 class="btn btn-sm btn-outline-danger w-100"
                                                 onclick="deleteImage(<?= $img['id'] ?>)">
@@ -569,42 +570,54 @@ $images = $stmtImg->fetchAll(PDO::FETCH_ASSOC);
     <script>
         function deleteImage(id) {
             Swal.fire({
-                title: 'ลบรูปนี้?',
+                title: 'ยืนยันการลบรูปนี้?',
+                text: "รูปจะยังไม่ถูกลบจริงจนกว่าคุณจะกดปุ่ม 'บันทึกการแก้ไข'",
                 icon: 'warning',
                 showCancelButton: true,
-                confirmButtonText: 'ลบ',
+                confirmButtonText: 'ตกลง',
                 cancelButtonText: 'ยกเลิก',
                 confirmButtonColor: '#dc3545'
             }).then(result => {
                 if (result.isConfirmed) {
-                    fetch('quickwin_image_delete.php', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/x-www-form-urlencoded'
-                            },
-                            body: 'id=' + id
-                        })
-                        .then(res => res.text())
-                        .then(() => {
-                            document.getElementById('img' + id).remove();
-                        });
+                    // 1. ซ่อน Element รูปในหน้าจอ
+                    const imgElement = document.getElementById('img' + id);
+                    if (imgElement) {
+                        imgElement.style.display = 'none';
+                    }
+
+                    // 2. สร้าง input hidden เพื่อส่ง ID ไปให้ไฟล์ update_quickwin.php
+                    const form = document.getElementById('quickwinEditForm');
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = 'delete_image_ids[]'; // ส่งเป็น Array
+                    input.value = id;
+                    form.appendChild(input);
                 }
             });
         }
     </script>
 
-    <?php if (!empty($_SESSION['flash_message'])): ?>
+    <?php
+    // ตรวจสอบว่ามีข้อความ Flash และต้องไม่ใช่ข้อความที่มาจากการบันทึก (quickwin_save)
+    if (!empty($_SESSION['flash_message']) && ($_SESSION['flash_from'] ?? '') !== 'quickwin_save'):
+    ?>
         <script>
             Swal.fire({
                 icon: '<?= $_SESSION['flash_type'] ?>',
-                title: 'ไม่สามารถบันทึกได้',
+                title: 'แจ้งเตือน',
                 text: '<?= addslashes($_SESSION['flash_message']) ?>',
                 confirmButtonColor: '#dc3545'
             });
         </script>
     <?php
-        unset($_SESSION['flash_message'], $_SESSION['flash_type']);
+        // ล้างค่าทิ้งทันทีหลังแสดงผล
+        unset($_SESSION['flash_message'], $_SESSION['flash_type'], $_SESSION['flash_from']);
     endif;
+
+    // กรณีที่เป็นการบันทึกสำเร็จ (มาจาก quickwin_save) ให้ล้างค่าทิ้งเงียบๆ ไม่ต้องแสดง alert ซ้ำ
+    if (($_SESSION['flash_from'] ?? '') === 'quickwin_save') {
+        unset($_SESSION['flash_message'], $_SESSION['flash_type'], $_SESSION['flash_from']);
+    }
     ?>
 </body>
 

@@ -16,6 +16,7 @@ if (file_exists('../config/db_connect.php')) {
     require_once 'config/db_connect.php';
 }
 
+
 /* =========================
    FORM TYPE (ใช้ระบุประเภทรูป)
 ========================= */
@@ -76,10 +77,13 @@ $p_id         = trim($_POST['supervisor_p_id'] ?? '');
 $t_id         = trim($_POST['teacher_t_pid'] ?? '');
 $option_ids   = $_POST['option_ids'] ?? [];
 $option_other = trim($_POST['option_other'] ?? '');
-$academic_year_post = (int)($_POST['academic_year'] ?? 0);
 $semester = (int)($_POST['semester'] ?? 0);
-
 $supervision_date = date('Y-m-d H:i:s');
+$academic_year = (int)($_POST['academic_year'] ?? 0);
+
+if ($academic_year < 2500) {
+    $academic_year = getAcademicYear($supervision_date);
+}
 
 /* =========================
    Validation
@@ -87,7 +91,6 @@ $supervision_date = date('Y-m-d H:i:s');
 if (
     $p_id === '' ||
     $t_id === '' ||
-    $academic_year_post === 0 ||
     $semester === 0 ||
     (empty($option_ids) && $option_other === '')
 ) {
@@ -98,13 +101,6 @@ if (
     );
 }
 
-/* =========================
-   คำนวณปีการศึกษา
-========================= */
-// ใช้ค่าจากฟอร์มเป็นหลัก (fallback กรณีผิดปกติ)
-$academic_year = ($academic_year_post > 2500)
-    ? $academic_year_post
-    : getAcademicYear($supervision_date);
 
 /* =========================
    ตรวจสอบ Quick Win ซ้ำ
@@ -204,8 +200,8 @@ try {
                         (
                             :pid,
                             :tid,
-                            NULL,
-                            NULL,
+                            '',
+                            '',
                             :fname,
                             :ay,
                             :form_type
@@ -239,13 +235,20 @@ try {
         'success'
     );
 } catch (PDOException $e) {
-
     $conn->rollBack();
-    error_log('QuickWin Save Error: ' . $e->getMessage());
+    // ลบการ redirect ออกชั่วคราว แล้วให้พ่น Error ออกมาดูเลย
+    echo "พบปัญหา SQL: " . $e->getMessage(); 
+    exit; 
 
-    redirect_with_flash_message(
-        'เกิดข้อผิดพลาดในการบันทึกข้อมูล',
-        'quickwin_form.php',
-        'danger'
-    );
+
+// catch (PDOException $e) {
+
+//     $conn->rollBack();
+//     error_log('QuickWin Save Error: ' . $e->getMessage());
+
+//     redirect_with_flash_message(
+//         'เกิดข้อผิดพลาดในการบันทึกข้อมูล',
+//         'quickwin_form.php',
+//         'danger'
+//     );
 }

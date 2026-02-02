@@ -138,7 +138,7 @@ $col2_options = array_slice($options, $half);
                         </h4>
                     </div>
 
-                    <form action="save_quickwin_data.php" method="POST" id="quickwinForm" enctype="multipart/form-data">
+                    <form id="evaluationForm" action="save_quickwin_data.php" method="POST" enctype="multipart/form-data">
 
                         <div class="card-body p-4 p-md-5">
 
@@ -352,14 +352,14 @@ $col2_options = array_slice($options, $half);
                 cancelButtonText: 'ยกเลิก'
             }).then((result) => {
                 if (result.isConfirmed) {
-                    document.getElementById('quickwinForm').submit();
+                    document.getElementById('evaluationForm').submit(); // แก้จาก quickwinForm เป็น evaluationForm
                 }
             });
         }
     </script>
 
     <script>
-        document.getElementById('quickwinForm').addEventListener('submit', function(e) {
+        document.getElementById('evaluationForm').addEventListener('submit', function(e) {
 
             const checkedCount = document.querySelectorAll('.qw-checkbox:checked').length;
             const otherText = document.getElementById('option_other').value.trim();

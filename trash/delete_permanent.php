@@ -124,13 +124,11 @@ try {
         /* --- ลบ KPI --- */
         $conn->prepare("
             DELETE FROM kpi_answers
-            WHERE supervisor_p_id = ?
-              AND teacher_t_pid = ?
-              AND subject_code = ?
-              AND inspection_time = ?
-              AND academic_year = ?
+            WHERE teacher_t_pid = ?
+            AND subject_code = ?
+            AND inspection_time = ?
+            AND (academic_year = ? OR academic_year = 0) 
         ")->execute([
-            $ownerPid,
             $t_pid,
             $subject_code,
             $inspection_time,
