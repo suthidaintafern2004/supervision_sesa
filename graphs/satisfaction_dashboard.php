@@ -244,19 +244,19 @@ try {
                         </div>
                         <div class="row text-center align-items-center">
                             <div class="col-md-3 border-end">
-                                <h5>ครูที่นิเทศ</h5>
+                                <h5>ครูที่ได้รับการนิเทศ</h5>
                                 <h2 class="fw-bold text-primary"><?= (int)$personal_summary['teachers'] ?></h2><small>คน</small>
                             </div>
                             <div class="col-md-3 border-end">
-                                <h5>โรงเรียนที่เข้า</h5>
+                                <h5>จำนวนโรงเรียน</h5>
                                 <h2 class="fw-bold text-success"><?= (int)$personal_summary['schools'] ?></h2><small>แห่ง</small>
                             </div>
                             <div class="col-md-3 border-end">
-                                <h5>กลุ่มสาระ</h5>
+                                <h5>กลุ่มสาระการเรียนรู้ฯ</h5>
                                 <h2 class="fw-bold text-warning"><?= (int)$personal_summary['subjects'] ?></h2><small>กลุ่ม</small>
                             </div>
                             <div class="col-md-3">
-                                <h5>บันทึกรวมทั้งหมด</h5>
+                                <h5>รวมจำนวน(ครั้ง)</h5>
                                 <h2 class="fw-bold text-danger"><?= (int)$count_cr + (int)$count_qw ?></h2><small>ครั้ง</small>
                             </div>
                         </div>

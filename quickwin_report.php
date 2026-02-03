@@ -18,13 +18,14 @@ try {
     // ========================
     $sql_info = "SELECT
                     qw.*,
-                    -- เอาการ JOIN quickwin_options แบบเก่าออก เพราะตอนนี้เก็บเป็น 1/6/9
-                    
                     /* ข้อมูลครู */
                     CONCAT(IFNULL(pt.prefix_name,''), t.f_name, ' ', t.l_name) AS t_fullname,
                     t.t_pid, 
                     pos_t.position_name AS t_position,
-                    IFNULL(sg.subjectgroup_name, IFNULL(sub.subject_name, '-')) AS learning_group,
+                    
+                    -- ดึงชื่อกลุ่มสาระจากตาราง subject_group โดยตรง
+                    IFNULL(sg.subjectgroup_name, '-') AS learning_group, 
+                    
                     s_school.school_name AS t_school,
                     
                     /* ข้อมูลผู้นิเทศ */
@@ -39,8 +40,9 @@ try {
                 LEFT JOIN prefix pt ON t.prefix_id = pt.prefix_id
                 LEFT JOIN school s_school ON t.school_id = s_school.school_id
                 LEFT JOIN position pos_t ON t.position_id = pos_t.position_id
-                LEFT JOIN subject sub ON t.subject_id = sub.subject_id
-                LEFT JOIN subject_group sg ON sub.subjectgroup_id = sg.subjectgroup_id
+                
+                -- แก้ไขจุดการ JOIN: เชื่อมตรงจาก teacher ไปยัง subject_group
+                LEFT JOIN subject_group sg ON t.subjectgroup_id = sg.subjectgroup_id
                 
                 -- Join ผู้นิเทศ
                 LEFT JOIN supervisor sp ON qw.p_id = sp.p_id

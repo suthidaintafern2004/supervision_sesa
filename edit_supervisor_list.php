@@ -61,7 +61,7 @@ try {
                 <div class="d-flex justify-content-between align-items-center">
                     <h5 class="mb-0 fw-bold page-title-lg">
                         <i class="fas fa-user-tie me-2"></i>
-                        จัดการข้อมูลผู้นิเทศก์
+                        จัดการข้อมูลศึกษานิเทศก์
                     </h5>
 
                     <div class="d-flex gap-2">
@@ -102,7 +102,7 @@ try {
             <div class="modal-content">
 
                 <div class="modal-header bg-success text-white">
-                    <h5 class="modal-title">เพิ่มข้อมูลผู้นิเทศก์</h5>
+                    <h5 class="modal-title">เพิ่มข้อมูลศึกษานิเทศก์</h5>
                     <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
 
@@ -173,7 +173,7 @@ try {
                                 <option value="role" selected disabled hidden>
                                     กรุณาเลือกสิทธิ์ผู้ใช้งาน
                                 </option>
-                                <option value="supervisor">ผู้นิเทศก์</option>
+                                <option value="supervisor">ศึกษานิเทศก์</option>
                                 <option value="admin">ผู้ดูแลระบบ</option>
                             </select>
                         </div>
@@ -196,7 +196,7 @@ try {
 
                 <div class="modal-header bg-warning">
                     <h5 class="modal-title">
-                        <i class="fas fa-edit me-1"></i> แก้ไขข้อมูลผู้นิเทศก์
+                        <i class="fas fa-edit me-1"></i> แก้ไขข้อมูลศึกษานิเทศก์
                     </h5>
                     <button class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
@@ -264,7 +264,7 @@ try {
                         <div class="col-md-6">
                             <label>สิทธิ์ผู้ใช้งาน</label>
                             <select name="role" id="edit_role" class="form-select" required>
-                                <option value="supervisor">ผู้นิเทศก์</option>
+                                <option value="supervisor">ศึกษานิเทศก์</option>
                                 <option value="admin">ผู้ดูแลระบบ</option>
                             </select>
                         </div>
