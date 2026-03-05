@@ -47,7 +47,7 @@ try {
         $stmt->execute(['pid' => $supervisor_p_id]);
         $supervisor_info = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        $cr_stmt = $conn->prepare("SELECT COUNT(*) FROM supervision_sessions WHERE supervisor_p_id = :pid AND academic_year = :year");
+        $cr_stmt = $conn->prepare("SELECT COUNT(*) FROM supervision_sessions WHERE p_id = :pid AND academic_year = :year");
         $cr_stmt->execute(['pid' => $supervisor_p_id, 'year' => $selected_year]);
         $count_cr = $cr_stmt->fetchColumn();
 
@@ -56,25 +56,25 @@ try {
         $count_qw = $qw_stmt->fetchColumn();
 
         $summaryStmt = $conn->prepare("
-            SELECT COUNT(DISTINCT ss.teacher_t_pid) AS teachers, COUNT(DISTINCT t.school_id) AS schools, COUNT(DISTINCT t.subjectgroup_id) AS subjects 
-            FROM supervision_sessions ss JOIN teacher t ON ss.teacher_t_pid = t.t_pid 
-            WHERE ss.supervisor_p_id = :pid AND ss.academic_year = :year
+            SELECT COUNT(DISTINCT ss.t_pid) AS teachers, COUNT(DISTINCT t.school_id) AS schools, COUNT(DISTINCT t.subjectgroup_id) AS subjects 
+            FROM supervision_sessions ss JOIN teacher t ON ss.t_pid = t.t_pid 
+            WHERE ss.p_id = :pid AND ss.academic_year = :year
         ");
         $summaryStmt->execute(['pid' => $supervisor_p_id, 'year' => $selected_year]);
         $personal_summary = $summaryStmt->fetch(PDO::FETCH_ASSOC);
 
         $stmt_sch = $conn->prepare("
             SELECT sc.school_name, COUNT(*) AS count FROM supervision_sessions ss 
-            JOIN teacher t ON ss.teacher_t_pid = t.t_pid JOIN school sc ON t.school_id = sc.school_id 
-            WHERE ss.supervisor_p_id = :pid AND ss.academic_year = :year GROUP BY sc.school_name ORDER BY count DESC
+            JOIN teacher t ON ss.t_pid = t.t_pid JOIN school sc ON t.school_id = sc.school_id 
+            WHERE ss.p_id = :pid AND ss.academic_year = :year GROUP BY sc.school_name ORDER BY count DESC
         ");
         $stmt_sch->execute(['pid' => $supervisor_p_id, 'year' => $selected_year]);
         $data_school = $stmt_sch->fetchAll(PDO::FETCH_ASSOC);
 
         $stmt_lg = $conn->prepare("
             SELECT sg.subjectgroup_name AS label, COUNT(*) AS value FROM supervision_sessions ss 
-            JOIN teacher t ON ss.teacher_t_pid = t.t_pid JOIN subject_group sg ON t.subjectgroup_id = sg.subjectgroup_id 
-            WHERE ss.supervisor_p_id = :pid AND ss.academic_year = :year GROUP BY sg.subjectgroup_name ORDER BY value DESC
+            JOIN teacher t ON ss.t_pid = t.t_pid JOIN subject_group sg ON t.subjectgroup_id = sg.subjectgroup_id 
+            WHERE ss.p_id = :pid AND ss.academic_year = :year GROUP BY sg.subjectgroup_name ORDER BY value DESC
         ");
         $stmt_lg->execute(['pid' => $supervisor_p_id, 'year' => $selected_year]);
         $data_lg = $stmt_lg->fetchAll(PDO::FETCH_ASSOC);
@@ -91,7 +91,7 @@ try {
         $data_main = $stmt_sat->fetchAll(PDO::FETCH_ASSOC);
 
         $main_table = ($form_type == '3') ? "quick_win" : "supervision_sessions";
-        $pid_col = ($form_type == '3') ? "t_pid" : "teacher_t_pid";
+        $pid_col = "t_pid";
 
         $stmt_sch = $conn->prepare("
             SELECT s.school_name, COUNT(m.$pid_col) as count FROM school s 

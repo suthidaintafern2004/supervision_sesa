@@ -54,8 +54,8 @@ try {
     $stmt = $conn->prepare("
         UPDATE supervision_sessions
         SET deleted_at = NOW()
-        WHERE supervisor_p_id = ?
-          AND teacher_t_pid   = ?
+        WHERE p_id = ?
+          AND t_pid   = ?
           AND subject_code    = ?
           AND inspection_time = ?
           AND deleted_at IS NULL

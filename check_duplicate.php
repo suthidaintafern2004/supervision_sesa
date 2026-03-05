@@ -9,7 +9,7 @@ $inspection_time = intval($_POST['inspection_time'] ?? 0);
 
 // ตรวจซ้ำในฐานข้อมูล
 $sql = "SELECT 1 FROM supervision_sessions 
-        WHERE teacher_t_pid = ? 
+        WHERE t_pid = ? 
           AND subject_code = ? 
           AND inspection_time = ?";
 

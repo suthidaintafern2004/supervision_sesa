@@ -111,8 +111,8 @@ try {
 // ========================
 $sql_images = "SELECT file_name 
                FROM images 
-               WHERE supervisor_p_id = :p_id 
-                 AND teacher_t_pid = :t_id 
+               WHERE p_id = :p_id 
+                 AND t_pid = :t_id 
                  AND form_type = 'qw'
                  AND (subject_code = '' OR subject_code IS NULL)
                  AND (inspection_time = '' OR inspection_time IS NULL)
@@ -157,7 +157,7 @@ $images = $stmt_img->fetchAll(PDO::FETCH_ASSOC);
                     <?php echo htmlspecialchars($info['t_fullname']); ?>
                 </div>
                 <div class="col-6">
-                    <strong>สังกัด (โรงเรียน):</strong>
+                    <strong>โรงเรียน:</strong>
                     <?php echo htmlspecialchars($info['t_school']); ?>
                 </div>
                 <div class="col-6">

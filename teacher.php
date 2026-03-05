@@ -28,11 +28,7 @@
             </div>
         </div>
 
-        <div class="col-md-6">
-            <label for="t_pid" class="form-label fw-bold">เลขบัตรประจำตัวประชาชน</label>
-            <input type="text" id="t_pid" name="t_pid"
-                class="form-control display-field bg-light" placeholder="--" readonly>
-        </div>
+        <input type="hidden" id="t_pid" name="t_pid">
 
         <div class="col-md-6">
             <label for="position_name" class="form-label fw-bold">ตำแหน่ง</label>

@@ -228,7 +228,7 @@ if (isset($_SESSION['error_message'])) {
             <div class="login-left">
                 <div class="welcome-content">
                     <h1>Welcome to<br>Website</h1>
-                    <p>ระบบรายงานผลสถิติและวิเคราะห์ข้อมูลการนิเทศการจัดการเรียนรู้ สำหรับศึกษานิเทศก์</p>
+                    <p>ระบบบันทึกข้อมูลและสารสนเทศการนิเทศการศึกษา สพม.ลำปาง ลำพูน</p>
                 </div>
                 <div class="shape-1"></div>
                 <div class="circle-1"></div>

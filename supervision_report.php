@@ -87,14 +87,14 @@ $kpi = null;
 try {
     if ($subcode && $time) {
         $sql_kpi = "SELECT * FROM supervision_sessions 
-                    WHERE supervisor_p_id = :spid AND teacher_t_pid = :tpid 
+                    WHERE p_id = :spid AND t_pid = :tpid 
                     AND subject_code = :sub AND inspection_time = :time";
         $stmt = $conn->prepare($sql_kpi);
         $stmt->execute([':spid' => $s_pid, ':tpid' => $t_pid, ':sub' => $subcode, ':time' => $time]);
         $kpi = $stmt->fetch(PDO::FETCH_ASSOC);
     } else {
         $sql_kpi = "SELECT * FROM supervision_sessions 
-                    WHERE supervisor_p_id = :spid AND teacher_t_pid = :tpid 
+                    WHERE p_id = :spid AND t_pid = :tpid 
                     ORDER BY supervision_date DESC LIMIT 1";
         $stmt = $conn->prepare($sql_kpi);
         $stmt->execute([':spid' => $s_pid, ':tpid' => $t_pid]);
@@ -123,8 +123,8 @@ if ($kpi) {
                     FROM kpi_indicators i
                     LEFT JOIN kpi_indicator_suggestions kis 
                     ON i.id = kis.indicator_id 
-                    AND kis.supervisor_p_id = :spid 
-                    AND kis.teacher_t_pid = :tpid 
+                    AND kis.p_id = :spid 
+                    AND kis.t_pid = :tpid 
                     AND kis.subject_code = :sub 
                     AND kis.inspection_time = :time
                     ORDER BY i.display_order ASC";
@@ -137,8 +137,8 @@ if ($kpi) {
                    FROM kpi_questions q
                    LEFT JOIN kpi_answers ka 
                    ON q.id = ka.question_id 
-                   AND ka.supervisor_p_id = :spid 
-                   AND ka.teacher_t_pid = :tpid 
+                   AND ka.p_id = :spid 
+                   AND ka.t_pid = :tpid 
                    AND ka.subject_code = :sub 
                    AND ka.inspection_time = :time
                    ORDER BY q.indicator_id ASC, q.display_order ASC";
@@ -188,7 +188,7 @@ $images = [];
 if ($kpi) {
     try {
         $sql_img = "SELECT file_name FROM images 
-                    WHERE supervisor_p_id = :spid AND teacher_t_pid = :tpid 
+                    WHERE p_id = :spid AND t_pid = :tpid 
                     AND subject_code = :sub AND inspection_time = :time";
         $stmt = $conn->prepare($sql_img);
         $stmt->execute([':spid' => $s_pid, ':tpid' => $t_pid, ':sub' => $subcode, ':time' => $time]);

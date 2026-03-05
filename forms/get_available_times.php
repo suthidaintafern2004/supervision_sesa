@@ -14,7 +14,7 @@ if (!$t_pid || !$subject_code) {
 $sql = "
     SELECT inspection_time
     FROM supervision_sessions
-    WHERE teacher_t_pid = :t_pid
+    WHERE t_pid = :t_pid
       AND subject_code = :subject_code
 ";  
 $stmt = $conn->prepare($sql);

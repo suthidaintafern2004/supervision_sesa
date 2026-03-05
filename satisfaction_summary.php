@@ -12,19 +12,18 @@ $session_id = intval($_GET['session_id']);
 // 2. ดึงข้อมูลการนิเทศเพื่อแสดงผลและเก็บใน Session
 $sql_info = "SELECT
                 ss.id AS session_id,
-                CONCAT(t.PrefixName, t.fname, ' ', t.lname) AS teacher_name,
-                CONCAT(sp.PrefixName, sp.fname, ' ', sp.lname) AS supervisor_name
+                CONCAT(IFNULL(pt.prefix_name, ''), t.f_name, ' ', t.l_name) AS teacher_name,
+                CONCAT(IFNULL(ps.prefix_name, ''), sp.fname, ' ', sp.lname) AS supervisor_name
             FROM supervision_sessions ss
-            LEFT JOIN teacher t ON ss.teacher_t_pid = t.t_pid
-            LEFT JOIN supervisor sp ON ss.supervisor_p_id = sp.p_id
+            LEFT JOIN teacher t ON ss.t_pid = t.t_pid
+            LEFT JOIN prefix pt ON t.prefix_id = pt.prefix_id
+            LEFT JOIN supervisor sp ON ss.p_id = sp.p_id
+            LEFT JOIN prefix ps ON sp.prefix_id = ps.prefix_id
             WHERE ss.id = ?";
 
 $stmt = $conn->prepare($sql_info);
-$stmt->bind_param("i", $session_id);
-$stmt->execute();
-$result = $stmt->get_result();
-$session_info = $result->fetch_assoc();
-$stmt->close();
+$stmt->execute([$session_id]);
+$session_info = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$session_info) {
     die("ไม่พบข้อมูลการนิเทศสำหรับรหัสนี้");

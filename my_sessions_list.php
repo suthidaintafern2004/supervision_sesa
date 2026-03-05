@@ -76,7 +76,7 @@ SELECT COUNT(*) FROM (
         'classroom' AS form_type,
         ss.academic_year
     FROM supervision_sessions ss
-    LEFT JOIN teacher t ON ss.teacher_t_pid = t.t_pid
+    LEFT JOIN teacher t ON ss.t_pid = t.t_pid
     LEFT JOIN prefix p ON t.prefix_id = p.prefix_id
     WHERE ss.deleted_at IS NULL
 
@@ -110,8 +110,8 @@ SELECT *
 FROM (
     SELECT 
         'classroom' AS form_type,
-        ss.supervisor_p_id,
-        ss.teacher_t_pid AS t_pid,
+        ss.p_id AS supervisor_p_id,
+        ss.t_pid AS t_pid,
         ss.subject_code,
         ss.subject_name,
         ss.inspection_time,
@@ -121,10 +121,10 @@ FROM (
         s.school_name,
         CONCAT(IFNULL(pr.prefix_name,''), sp.fname,' ',sp.lname) AS supervisor_name
     FROM supervision_sessions ss
-    LEFT JOIN teacher t ON ss.teacher_t_pid = t.t_pid
+    LEFT JOIN teacher t ON ss.t_pid = t.t_pid
     LEFT JOIN prefix p ON t.prefix_id = p.prefix_id
     LEFT JOIN school s ON t.school_id = s.school_id
-    LEFT JOIN supervisor sp ON ss.supervisor_p_id = sp.p_id
+    LEFT JOIN supervisor sp ON ss.p_id = sp.p_id
     LEFT JOIN prefix pr ON sp.prefix_id = pr.prefix_id
     WHERE ss.deleted_at IS NULL
 
@@ -303,6 +303,8 @@ $academicYears = $yearStmt->fetchAll(PDO::FETCH_COLUMN);
                                                 <input type="hidden" name="kpi_ref[t_pid]" value="<?= htmlspecialchars($r['t_pid']) ?>">
                                                 <input type="hidden" name="kpi_ref[subject_code]" value="<?= htmlspecialchars($r['subject_code']) ?>">
                                                 <input type="hidden" name="kpi_ref[inspection_time]" value="<?= htmlspecialchars($r['inspection_time']) ?>">
+                                                <input type="hidden" name="kpi_ref[p_id]" value="<?= htmlspecialchars($r['supervisor_p_id']) ?>">
+                                                <input type="hidden" name="kpi_ref[academic_year]" value="<?= htmlspecialchars($r['academic_year']) ?>">
 
                                                 <button type="submit"
                                                     class="btn btn-sm btn-warning me-1"
@@ -441,7 +443,7 @@ $academicYears = $yearStmt->fetchAll(PDO::FETCH_COLUMN);
         });
     </script>
 
-    <?php if (!empty($_SESSION['flash_message']) && !empty($_SESSION['flash_once'])): ?>
+    <?php if (!empty($_SESSION['flash_message'])): ?>
         <script>
             document.addEventListener('DOMContentLoaded', function() {
                 // 1. ตรวจสอบพารามิเตอร์ success จาก URL (เช่น ?success=update หรือ ?success=delete)
@@ -453,9 +455,11 @@ $academicYears = $yearStmt->fetchAll(PDO::FETCH_COLUMN);
                     if (successStatus === 'update' || successStatus === 'delete' || successStatus === 'save') {
                         Swal.fire({
                             icon: '<?= $_SESSION['flash_type'] ?? 'success' ?>',
-                            title: 'ดำเนินการสำเร็จ',
+                            title: 'สำเร็จ',
                             text: '<?= addslashes($_SESSION['flash_message']) ?>',
-                            confirmButtonColor: '#198754'
+                            timer: 2000,
+                            showConfirmButton: false,
+                            timerProgressBar: true
                         }).then(() => {
                             // 3. ล้างพารามิเตอร์บน URL ออกหลังกด OK เพื่อป้องกันการ Refresh แล้วเด้งซ้ำ
                             const newUrl = window.location.pathname;
@@ -465,7 +469,7 @@ $academicYears = $yearStmt->fetchAll(PDO::FETCH_COLUMN);
 
                     <?php
                     // ล้างค่า Session ทันทีเพื่อไม่ให้ค้างไปหน้าอื่น
-                    unset($_SESSION['flash_message'], $_SESSION['flash_type']);
+                    unset($_SESSION['flash_message'], $_SESSION['flash_type'], $_SESSION['flash_once']);
                     ?>
                 <?php endif; ?>
             });

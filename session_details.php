@@ -67,8 +67,8 @@ try {
 
             /* ===== NORMAL ===== */
             SELECT 
-                ss.supervisor_p_id,
-                ss.teacher_t_pid,
+                ss.p_id AS supervisor_p_id,
+                ss.t_pid AS teacher_t_pid,
                 ss.subject_code,
                 ss.inspection_time,
                 'normal' AS session_type,
@@ -80,8 +80,8 @@ try {
                 (
                     SELECT COUNT(*)
                     FROM kpi_answers ka
-                    WHERE ka.supervisor_p_id = ss.supervisor_p_id
-                      AND ka.teacher_t_pid   = ss.teacher_t_pid
+                    WHERE ka.p_id = ss.p_id
+                      AND ka.t_pid   = ss.t_pid
                       AND ka.subject_code    = ss.subject_code
                       AND ka.inspection_time = ss.inspection_time
                 ) AS kpi_count,
@@ -90,8 +90,8 @@ try {
                 (CASE WHEN EXISTS (
                     SELECT 1
                     FROM satisfaction_answers sa
-                    WHERE sa.supervisor_p_id = ss.supervisor_p_id
-                      AND sa.teacher_t_pid   = ss.teacher_t_pid
+                    WHERE sa.p_id = ss.p_id
+                      AND sa.t_pid   = ss.t_pid
                       AND sa.subject_code    = ss.subject_code
                       AND sa.inspection_time = ss.inspection_time
                 ) THEN 1 ELSE 0 END) AS status,
@@ -101,9 +101,9 @@ try {
                 NULL AS qw_date
 
             FROM supervision_sessions ss
-            LEFT JOIN supervisor s ON ss.supervisor_p_id = s.p_id
+            LEFT JOIN supervisor s ON ss.p_id = s.p_id
             LEFT JOIN prefix p ON s.prefix_id = p.prefix_id
-            WHERE ss.teacher_t_pid = :pid1
+            WHERE ss.t_pid = :pid1
                 AND ss.deleted_at IS NULL
                 AND (:year = '' OR ss.academic_year = :year)
 

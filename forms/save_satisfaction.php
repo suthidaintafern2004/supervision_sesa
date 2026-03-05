@@ -73,8 +73,8 @@ try {
         $stmt = $conn->prepare("
             SELECT supervision_date
             FROM supervision_sessions
-            WHERE supervisor_p_id = ?
-              AND teacher_t_pid   = ?
+            WHERE p_id = ?
+              AND t_pid   = ?
               AND subject_code    = ?
               AND inspection_time = ?
             LIMIT 1
@@ -97,7 +97,7 @@ try {
         /* === 3) INSERT คะแนน (พร้อมวันเวลา) === */
         $stmt = $conn->prepare("
             INSERT INTO satisfaction_answers
-            (supervisor_p_id, teacher_t_pid, subject_code, inspection_time,
+            (p_id, t_pid, subject_code, inspection_time,
              question_id, rating, academic_year, satisfaction_date)
             VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
         ");
@@ -121,8 +121,8 @@ try {
                 satisfaction_submitted  = 1,
                 satisfaction_date       = NOW(),
                 academic_year           = ?
-            WHERE supervisor_p_id = ?
-              AND teacher_t_pid   = ?
+            WHERE p_id = ?
+              AND t_pid   = ?
               AND subject_code    = ?
               AND inspection_time = ?
         ");

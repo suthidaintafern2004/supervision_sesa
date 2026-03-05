@@ -1,5 +1,10 @@
 <?php
 session_start();
+
+// ini_set('display_errors', 1);
+// ini_set('display_startup_errors', 1);
+// error_reporting(E_ALL);
+
 require_once 'config/db_connect.php';
 
 /* =========================
@@ -62,7 +67,7 @@ try {
         FROM teacher t
         WHERE (
             t.t_pid IN (
-                SELECT teacher_t_pid
+                SELECT t_pid
                 FROM supervision_sessions
                 WHERE deleted_at IS NULL
                 " . (!empty($selected_year) ? " AND academic_year = :year " : "") . "
@@ -116,7 +121,7 @@ try {
             (
                 SELECT COUNT(*)
                 FROM supervision_sessions
-                WHERE teacher_t_pid = t.t_pid
+                WHERE t_pid = t.t_pid
                 AND deleted_at IS NULL
                 " . (!empty($selected_year) ? " AND academic_year = :year " : "") . "
             ) AS count_normal,
@@ -135,7 +140,7 @@ try {
                 IFNULL((
                     SELECT MAX(supervision_date)
                     FROM supervision_sessions
-                    WHERE teacher_t_pid = t.t_pid
+                    WHERE t_pid = t.t_pid
                     AND deleted_at IS NULL
                     " . (!empty($selected_year) ? " AND academic_year = :year " : "") . "
                 ), '0000-00-00'),
@@ -155,7 +160,7 @@ try {
 
         WHERE (
             t.t_pid IN (
-                SELECT teacher_t_pid
+                SELECT t_pid
                 FROM supervision_sessions
                 WHERE deleted_at IS NULL
                 " . (!empty($selected_year) ? " AND academic_year = :year " : "") . "
@@ -271,7 +276,7 @@ try {
                         <ul class="dropdown-menu dropdown-menu-end shadow-sm">
                             <li>
                                 <a class="dropdown-item" href="graphs/satisfaction_dashboard.php?form_type=1">
-                                    <i class="fas fa-chart-line text-primary me-2"></i> การนิเทศปกติ
+                                    <i class="fas fa-chart-line text-primary me-2"></i> Classroom
                                 </a>
                             </li>
                             <li>

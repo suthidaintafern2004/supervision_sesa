@@ -1,7 +1,7 @@
 <?php
 
 /*********************************
- * TRASH INDEX (PRODUCTION FINAL)
+ * TRASH INDEX (UPDATED FOR NEW DB)
  *********************************/
 
 error_reporting(E_ALL);
@@ -30,11 +30,11 @@ $isAdmin = ($_SESSION['role'] ?? '') === 'admin';
 $sql = "
 SELECT *
 FROM (
-    /* ---------- CLASSROOM ---------- */
+    /* ---------- CLASSROOM (ปรับชื่อฟิลด์เป็น p_id / t_pid) ---------- */
     SELECT
         'classroom' AS form_type,
-        ss.supervisor_p_id,
-        ss.teacher_t_pid AS t_pid,
+        ss.p_id AS supervisor_p_id,
+        ss.t_pid,
         ss.subject_code,
         ss.subject_name,
         ss.inspection_time,
@@ -43,7 +43,7 @@ FROM (
         ss.deleted_at,
         CONCAT(p.prefix_name,' ',t.f_name,' ',t.l_name) AS teacher_name
     FROM supervision_sessions ss
-    LEFT JOIN teacher t ON ss.teacher_t_pid = t.t_pid
+    LEFT JOIN teacher t ON ss.t_pid = t.t_pid
     LEFT JOIN prefix p ON t.prefix_id = p.prefix_id
     WHERE ss.deleted_at IS NOT NULL
 
@@ -71,6 +71,7 @@ FROM (
 $params = [];
 
 if (!$isAdmin) {
+    // กรองข้อมูลเฉพาะของผู้นิเทศที่ล็อกอินอยู่
     $sql .= " WHERE supervisor_p_id = ? ";
     $params[] = $user_id;
 }
@@ -142,7 +143,7 @@ $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                         <td class="text-center"><?= $r['inspection_time'] ?? '-' ?></td>
 
                                         <td class="text-center">
-                                            <?= date('d/m/Y', strtotime($r['supervision_date'])) ?>
+                                            <?= ($r['supervision_date']) ? date('d/m/Y', strtotime($r['supervision_date'])) : '-' ?>
                                         </td>
 
                                         <td class="text-center text-danger">
@@ -151,42 +152,26 @@ $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
                                         <td class="text-center">
 
-                                            <!-- RESTORE -->
-                                            <form method="POST"
-                                                action="restore.php"
-                                                class="d-inline restore-form">
+                                            <form method="POST" action="restore.php" class="d-inline restore-form">
                                                 <input type="hidden" name="form_type" value="<?= $r['form_type'] ?>">
-
-                                                <?php if ($r['form_type'] === 'quickwin'): ?>
-                                                    <input type="hidden" name="p_id" value="<?= $r['supervisor_p_id'] ?>">
-                                                <?php endif; ?>
-
+                                                <input type="hidden" name="p_id" value="<?= $r['supervisor_p_id'] ?>">
                                                 <input type="hidden" name="t_pid" value="<?= $r['t_pid'] ?>">
                                                 <input type="hidden" name="subject_code" value="<?= $r['subject_code'] ?>">
                                                 <input type="hidden" name="inspection_time" value="<?= $r['inspection_time'] ?>">
-                                                <input type="hidden" name="supervision_date" value="<?= $r['supervision_date'] ?>">
                                                 <input type="hidden" name="academic_year" value="<?= $r['academic_year'] ?>">
-                                                <button type="button" class="btn btn-success btn-sm">
+                                                <button type="button" class="btn btn-success btn-sm" title="กู้คืน">
                                                     <i class="fas fa-undo"></i>
                                                 </button>
                                             </form>
 
-                                            <!-- DELETE PERMANENT -->
-                                            <form method="POST"
-                                                action="delete_permanent.php"
-                                                class="d-inline delete-form">
+                                            <form method="POST" action="delete_permanent.php" class="d-inline delete-form">
                                                 <input type="hidden" name="form_type" value="<?= $r['form_type'] ?>">
-
-                                                <?php if ($r['form_type'] === 'quickwin'): ?>
-                                                    <input type="hidden" name="p_id" value="<?= $r['supervisor_p_id'] ?>">
-                                                <?php endif; ?>
-
+                                                <input type="hidden" name="p_id" value="<?= $r['supervisor_p_id'] ?>">
                                                 <input type="hidden" name="t_pid" value="<?= $r['t_pid'] ?>">
                                                 <input type="hidden" name="subject_code" value="<?= $r['subject_code'] ?>">
                                                 <input type="hidden" name="inspection_time" value="<?= $r['inspection_time'] ?>">
-                                                <input type="hidden" name="supervision_date" value="<?= $r['supervision_date'] ?>">
                                                 <input type="hidden" name="academic_year" value="<?= $r['academic_year'] ?>">
-                                                <button type="button" class="btn btn-danger btn-sm">
+                                                <button type="button" class="btn btn-danger btn-sm" title="ลบถาวร">
                                                     <i class="fas fa-times"></i>
                                                 </button>
                                             </form>

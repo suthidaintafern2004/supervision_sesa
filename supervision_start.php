@@ -79,14 +79,6 @@ require_once 'config/db_connect.php';
                                 value="<?= htmlspecialchars($supervisor_pid); ?>">
                         </div>
 
-                        <!-- เลขประจำตัวประชาชน -->
-                        <div class="col-md-6">
-                            <label class="form-label fw-bold">เลขประจำตัวประชาชน</label>
-                            <input type="text" id="display_pid"
-                                class="form-control display-field"
-                                value="<?= htmlspecialchars($supervisor_pid); ?>" readonly>
-                        </div>
-
                         <!-- สังกัด -->
                         <div class="col-md-6">
                             <label class="form-label fw-bold">สังกัด</label>
@@ -95,12 +87,18 @@ require_once 'config/db_connect.php';
                                 value="<?= htmlspecialchars($supervisor_office); ?>" readonly>
                         </div>
 
-                        <!-- ตำแหน่ง / วิทยฐานะ -->
+                        <!-- ตำแหน่ง -->
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">ตำแหน่ง / วิทยฐานะ</label>
+                            <label class="form-label fw-bold">ตำแหน่ง</label>
                             <input type="text" id="display_position"
                                 class="form-control display-field"
-                                value="<?= htmlspecialchars($supervisor_position . ' / ' . $supervisor_rank); ?>" readonly>
+                                value="<?= htmlspecialchars($supervisor_position); ?>" readonly>
+                        </div>
+
+                        <!-- วิทยฐานะ -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">วิทยฐานะ</label>
+                            <input type="text" id="display_rank" class="form-control display-field" value="<?= htmlspecialchars($supervisor_rank); ?>" readonly>
                         </div>
 
                     </div>

@@ -107,12 +107,12 @@ if ($mode === 'normal') {
             CONCAT(ps.prefix_name, sp.fname,' ',sp.lname) AS supervisor_full_name,
             CONCAT(pt.prefix_name, t.f_name,' ',t.l_name) AS teacher_full_name
         FROM supervision_sessions ss
-        JOIN supervisor sp ON ss.supervisor_p_id = sp.p_id
-        JOIN teacher t ON ss.teacher_t_pid = t.t_pid
+        JOIN supervisor sp ON ss.p_id = sp.p_id
+        JOIN teacher t ON ss.t_pid = t.t_pid
         LEFT JOIN prefix ps ON sp.prefix_id = ps.prefix_id
         LEFT JOIN prefix pt ON t.prefix_id = pt.prefix_id
-        WHERE ss.supervisor_p_id = ?
-          AND ss.teacher_t_pid   = ?
+        WHERE ss.p_id = ?
+          AND ss.t_pid   = ?
           AND ss.subject_code    = ?
           AND ss.inspection_time = ?
           AND ss.deleted_at IS NULL

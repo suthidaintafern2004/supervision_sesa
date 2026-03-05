@@ -1,8 +1,6 @@
 <?php
-// 1. เรียกใช้การตั้งค่า Session 5 ชั่วโมง (ถอยออกไป 1 ชั้น)
 require_once '../config/session_config.php';
 
-// 2. ตรวจเช็คสิทธิ์การเข้าใช้งาน
 if (empty($_SESSION['user_id'])) {
     die('Session หมดอายุ ไม่สามารถบันทึกการแก้ไขได้ กรุณาล็อกอินใหม่อีกครั้ง');
 }
@@ -14,237 +12,109 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 /* =====================================================
-   1) KEY เดิม (ใช้หา session เก่า)
+   1) KEY เดิม (อ้างอิงตาม Primary Key ใน SQL: t_pid, subject_code, inspection_time, academic_year)
 ===================================================== */
 $old_t_pid           = $_POST['old_t_pid'] ?? null;
 $old_subject_code    = $_POST['old_subject_code'] ?? null;
 $old_inspection_time = $_POST['old_inspection_time'] ?? null;
-$old_supervisor_id   = $_POST['old_supervisor_p_id'] ?? null;
+$old_p_id            = $_POST['old_p_id'] ?? null;
+$old_academic_year   = $_POST['academic_year_hidden'] ?? null;
 
 /* =====================================================
    2) ค่าใหม่จากฟอร์ม
 ===================================================== */
-$new_supervisor_id   = $_POST['supervisor_p_id'] ?? $old_supervisor_id;
-$new_t_pid           = $_POST['teacher_t_pid'] ?? $old_t_pid;
+$new_p_id            = $_POST['p_id'] ?? $old_p_id;
+$new_t_pid           = $_POST['t_pid'] ?? $old_t_pid;
 $new_subject_code    = $_POST['subject_code'] ?? null;
 $new_subject_name    = $_POST['subject_name'] ?? null;
 $new_inspection_time = $_POST['inspection_time'] ?? null;
 $overall_suggestion  = $_POST['overall_suggestion'] ?? null;
-$new_academic_year = $_POST['academic_year'] ?? null;
+$new_academic_year   = $_POST['academic_year'] ?? null;
 $new_inspection_date = $_POST['inspection_date'] ?? null;
-$semester = $_POST['semester'] ?? null;
+$semester            = $_POST['semester'] ?? 0; // ตาม SQL เป็น tinyint(4)
 
 /* =====================================================
-   3) ข้อมูลย่อย
+   3) ตรวจสอบข้อมูลเบื้องต้น
 ===================================================== */
-$ratings               = $_POST['ratings'] ?? [];
-$indicator_suggestions = $_POST['indicator_suggestions'] ?? [];
-$existing_images       = $_POST['existing_images'] ?? [];
-
-$redirect_back = $_POST['redirect_back'] ?? '../index.php';
-
-$form_type = $_POST['form_type'] ?? 'kpi';
-
-$academic_year_for_image =
-    $_POST['academic_year']
-    ?? $_POST['academic_year_hidden']
-    ?? null;
-
-if (!$academic_year_for_image) {
-    throw new Exception('ไม่พบปีการศึกษาสำหรับรูปภาพ');
-}
-
-/* =====================================================
-   4) ตรวจสอบข้อมูล
-===================================================== */
-if (
-    !$old_t_pid || !$old_subject_code || !$old_inspection_time || !$old_supervisor_id ||
-    !$new_supervisor_id || !$new_t_pid || !$new_subject_code || !$new_inspection_time ||
-    !$new_academic_year || !$new_inspection_date || !$semester
-) {
-    die('ข้อมูลไม่ครบ');
+if (!$old_t_pid || !$old_subject_code || !$old_inspection_time || !$new_p_id || !$new_academic_year) {
+    die('ข้อมูลสำหรับระบุรายการหรือข้อมูลใหม่ไม่ครบถ้วน');
 }
 
 try {
     $conn->beginTransaction();
 
-    // ===============================
-    // CHECK DATA CHANGE
-    // ===============================
-    $check = $conn->prepare("
-    SELECT supervisor_p_id, teacher_t_pid, subject_code, subject_name,
-       inspection_time, inspection_date, academic_year, semester, overall_suggestion
-    FROM supervision_sessions
-    WHERE supervisor_p_id = ?
-      AND teacher_t_pid   = ?
-      AND subject_code    = ?
-      AND inspection_time = ?
-      AND deleted_at IS NULL
-");
-    $check->execute([
-        $old_supervisor_id,
-        $old_t_pid,
-        $old_subject_code,
-        $old_inspection_time
-    ]);
-    $oldData = $check->fetch(PDO::FETCH_ASSOC);
+    /* =====================================================
+       4) ลบข้อมูลเดิมในตารางหลักและตารางที่เกี่ยวข้อง (Delete)
+       ลบตามลำดับเพื่อความปลอดภัยของ Transaction
+    ===================================================== */
+    $delParams = [$old_p_id, $old_t_pid, $old_subject_code, $old_inspection_time, $old_academic_year];
+    $whereClause = "WHERE p_id = ? AND t_pid = ? AND subject_code = ? AND inspection_time = ? AND academic_year = ?";
 
-    if (!$oldData) {
-        throw new Exception('ไม่พบข้อมูลเดิม');
-    }
+    $conn->prepare("DELETE FROM kpi_answers $whereClause")->execute($delParams);
+    $conn->prepare("DELETE FROM kpi_indicator_suggestions $whereClause")->execute($delParams);
 
-    $noChange =
-        $oldData['supervisor_p_id'] == $new_supervisor_id &&
-        $oldData['teacher_t_pid']   == $new_t_pid &&
-        $oldData['subject_code']    == $new_subject_code &&
-        $oldData['subject_name']    == $new_subject_name &&
-        $oldData['inspection_time'] == $new_inspection_time &&
-        $oldData['academic_year']   == $new_academic_year &&
-        $oldData['semester']        == $semester &&
-        $oldData['inspection_date'] == $new_inspection_date &&
-        trim($oldData['overall_suggestion']) == trim($overall_suggestion);
-
-    if ($noChange && empty($ratings) && empty($indicator_suggestions) && empty($_FILES['images']['name'][0])) {
-        throw new Exception('ไม่มีการเปลี่ยนแปลงข้อมูล');
-    }
-
+    // ลบ session หลัก (Primary Key: t_pid, subject_code, inspection_time, academic_year)
+    $stmtDelSession = $conn->prepare("DELETE FROM supervision_sessions WHERE t_pid = ? AND subject_code = ? AND inspection_time = ? AND academic_year = ?");
+    $stmtDelSession->execute([$old_t_pid, $old_subject_code, $old_inspection_time, $old_academic_year]);
 
     /* =====================================================
-       5) UPDATE supervision_sessions
+       5) แทรกข้อมูลใหม่ (Insert) ลงใน supervision_sessions
     ===================================================== */
-    $stmt = $conn->prepare("
-        UPDATE supervision_sessions
-        SET supervisor_p_id    = ?,
-            teacher_t_pid      = ?,
-            subject_code       = ?,
-            subject_name       = ?,
-            inspection_time    = ?,
-            inspection_date   = ?, 
-            academic_year      = ?,
-            semester           = ?, 
-            overall_suggestion = ?
-        WHERE supervisor_p_id = ?
-          AND teacher_t_pid   = ?
-          AND subject_code    = ?
-          AND inspection_time = ?
-          AND deleted_at IS NULL
+    $stmtIns = $conn->prepare("
+        INSERT INTO supervision_sessions (
+            p_id, t_pid, subject_code, subject_name, 
+            inspection_time, inspection_date, overall_suggestion, 
+            academic_year, semester
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
-
-    $stmt->execute([
-        $new_supervisor_id,
+    $stmtIns->execute([
+        $new_p_id,
         $new_t_pid,
         $new_subject_code,
         $new_subject_name,
         $new_inspection_time,
         $new_inspection_date,
-        $new_academic_year,
-        $semester,
         $overall_suggestion,
-        $old_supervisor_id,
-        $old_t_pid,
-        $old_subject_code,
-        $old_inspection_time
+        $new_academic_year,
+        $semester
     ]);
 
     /* =====================================================
-       6) KPI ANSWERS
+       6) แทรกคะแนน KPI (kpi_answers)
     ===================================================== */
-    $conn->prepare("
-        DELETE FROM kpi_answers
-        WHERE supervisor_p_id = ?
-        AND teacher_t_pid   = ?
-        AND subject_code    = ?
-        AND inspection_time = ?
-    ")->execute([
-        $old_supervisor_id,
-        $old_t_pid,
-        $old_subject_code,
-        $old_inspection_time
-    ]);
-
-    // 2. Insert ใหม่ (ระบุคอลัมน์ให้ครบตามโครงสร้างตารางจริง)
     $stmtAns = $conn->prepare("
-        INSERT INTO kpi_answers
-        (supervisor_p_id, teacher_t_pid, subject_code, inspection_time, question_id, rating_score, academic_year, supervision_date)
+        INSERT INTO kpi_answers (question_id, rating_score, p_id, t_pid, subject_code, inspection_time, supervision_date, academic_year)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     ");
-
-    foreach ($ratings as $qid => $score) {
-        $stmtAns->execute([
-            $new_supervisor_id,
-            $new_t_pid,
-            $new_subject_code,
-            $new_inspection_time,
-            $qid,
-            $score,
-            $new_academic_year,  // <--- เพิ่มค่าปีการศึกษาที่นี่
-            $new_inspection_date // <--- เพิ่มค่าวันที่ที่นี่
-        ]);
+    foreach (($_POST['ratings'] ?? []) as $qid => $score) {
+        $stmtAns->execute([$qid, $score, $new_p_id, $new_t_pid, $new_subject_code, $new_inspection_time, $new_inspection_date, $new_academic_year]);
     }
 
     /* =====================================================
-        7) KPI INDICATOR SUGGESTIONS (เพิ่มปีการศึกษา)
+       7) แทรกข้อเสนอแนะรายตัวบ่งชี้ (kpi_indicator_suggestions)
     ===================================================== */
-    // 1. ลบของเก่าออกก่อน
-    $conn->prepare("
-        DELETE FROM kpi_indicator_suggestions
-        WHERE supervisor_p_id = ?
-        AND teacher_t_pid   = ?
-        AND subject_code    = ?
-        AND inspection_time = ?
-    ")->execute([
-        $old_supervisor_id,
-        $old_t_pid,
-        $old_subject_code,
-        $old_inspection_time
-    ]);
-
-    // 2. Insert ใหม่
     $stmtNote = $conn->prepare("
-        INSERT INTO kpi_indicator_suggestions
-        (supervisor_p_id, teacher_t_pid, subject_code, inspection_time, indicator_id, suggestion_text, academic_year)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO kpi_indicator_suggestions (indicator_id, suggestion_text, p_id, t_pid, subject_code, inspection_time, supervision_date, academic_year)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     ");
-
-    foreach ($indicator_suggestions as $iid => $text) {
+    foreach (($_POST['indicator_suggestions'] ?? []) as $iid => $text) {
         if (trim($text) !== '') {
-            $stmtNote->execute([
-                $new_supervisor_id,
-                $new_t_pid,
-                $new_subject_code,
-                $new_inspection_time,
-                $iid,
-                $text,
-                $new_academic_year // <--- เพิ่มค่าปีการศึกษาที่นี่
-            ]);
+            $stmtNote->execute([$iid, $text, $new_p_id, $new_t_pid, $new_subject_code, $new_inspection_time, $new_inspection_date, $new_academic_year]);
         }
     }
 
     /* =====================================================
-       8) HANDLE IMAGE UPLOAD (NEW IMAGES)
+       8) จัดการรูปภาพ (Images)
     ===================================================== */
+    // 8.1 จัดการไฟล์ใหม่
     $uploaded_files = [];
-
     if (!empty($_FILES['images']['name'][0])) {
-
         $upload_dir = __DIR__ . '/../uploads/';
-        if (!is_dir($upload_dir)) {
-            mkdir($upload_dir, 0777, true);
-        }
-
+        if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
         foreach ($_FILES['images']['tmp_name'] as $index => $tmpName) {
-
             if ($_FILES['images']['error'][$index] === UPLOAD_ERR_OK) {
-
                 $ext = strtolower(pathinfo($_FILES['images']['name'][$index], PATHINFO_EXTENSION));
-                $allowed = ['jpg', 'jpeg', 'png', 'webp'];
-
-                if (!in_array($ext, $allowed)) {
-                    continue;
-                }
-
                 $newFileName = uniqid('kpi_', true) . '.' . $ext;
-
                 if (move_uploaded_file($tmpName, $upload_dir . $newFileName)) {
                     $uploaded_files[] = $newFileName;
                 }
@@ -252,72 +122,30 @@ try {
         }
     }
 
-    /* =====================================================
-       9) IMAGES (DELETE + INSERT)
-    ===================================================== */
-    $existing_ids = array_keys($existing_images);
-
+    // 8.2 ลบรูปภาพที่ถูกคัดออก และอัปเดต Key รูปเดิม
+    $existing_ids = !empty($_POST['existing_images']) ? array_keys($_POST['existing_images']) : [];
     if (!empty($existing_ids)) {
         $placeholders = implode(',', array_fill(0, count($existing_ids), '?'));
+        $conn->prepare("DELETE FROM images WHERE p_id = ? AND t_pid = ? AND subject_code = ? AND inspection_time = ? AND id NOT IN ($placeholders)")
+            ->execute([$old_p_id, $old_t_pid, $old_subject_code, $old_inspection_time]);
 
-        $params = array_merge(
-            [$old_supervisor_id, $old_t_pid, $old_subject_code, $old_inspection_time],
-            $existing_ids
-        );
-
-        $conn->prepare("
-        DELETE FROM images
-        WHERE supervisor_p_id = ?
-          AND teacher_t_pid   = ?
-          AND subject_code    = ?
-          AND inspection_time = ?
-          AND id NOT IN ($placeholders)
-    ")->execute($params);
+        $conn->prepare("UPDATE images SET p_id=?, t_pid=?, subject_code=?, inspection_time=?, academic_year=? WHERE id IN ($placeholders)")
+            ->execute([$new_p_id, $new_t_pid, $new_subject_code, $new_inspection_time, $new_academic_year]);
     } else {
-        // ถ้า user ลบรูปเก่าหมด
-        $conn->prepare("
-        DELETE FROM images
-        WHERE supervisor_p_id = ?
-          AND teacher_t_pid   = ?
-          AND subject_code    = ?
-          AND inspection_time = ?
-    ")->execute([
-            $old_supervisor_id,
-            $old_t_pid,
-            $old_subject_code,
-            $old_inspection_time
-        ]);
+        $conn->prepare("DELETE FROM images WHERE p_id = ? AND t_pid = ? AND subject_code = ? AND inspection_time = ?")
+            ->execute([$old_p_id, $old_t_pid, $old_subject_code, $old_inspection_time]);
     }
 
-    $stmtImg = $conn->prepare("
-    INSERT INTO images
-    (supervisor_p_id, teacher_t_pid, subject_code, inspection_time,
-     file_name, academic_year, form_type)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-");
-
-    foreach ($uploaded_files as $file_name) {
-        $stmtImg->execute([
-            $new_supervisor_id,
-            $new_t_pid,
-            $new_subject_code,
-            $new_inspection_time,
-            $file_name,
-            $academic_year_for_image,
-            $form_type
-        ]);
+    // 8.3 เพิ่มรูปภาพใหม่ลงฐานข้อมูล
+    $stmtImg = $conn->prepare("INSERT INTO images (p_id, t_pid, subject_code, inspection_time, file_name, academic_year, form_type) VALUES (?, ?, ?, ?, ?, ?, ?)");
+    foreach ($uploaded_files as $fname) {
+        $stmtImg->execute([$new_p_id, $new_t_pid, $new_subject_code, $new_inspection_time, $fname, $new_academic_year, $form_type]);
     }
 
-    /* =====================================================
-       10) COMMIT
-    ===================================================== */
     $conn->commit();
-
     header("Location: ../my_sessions_list.php?success=update");
     exit;
 } catch (Exception $e) {
-    if ($conn->inTransaction()) {
-        $conn->rollBack();
-    }
-    echo '❌ Error: ' . $e->getMessage();
+    if ($conn->inTransaction()) $conn->rollBack();
+    die('❌ Error: ' . $e->getMessage());
 }

@@ -44,21 +44,20 @@ try {
     // 2) ตรวจซ้ำ: ครู + วิชา + ครั้ง + ปีการศึกษา + ภาคเรียน
     // --------------------------------------------
     $sqlDup = "SELECT 1 FROM supervision_sessions 
-               WHERE teacher_t_pid = ? 
+               WHERE t_pid = ? 
                AND REPLACE(LOWER(subject_code),' ','') = ? 
                AND inspection_time = ? 
-               AND academic_year = ? 
-               AND semester = ? LIMIT 1";
+               AND academic_year = ? LIMIT 1";
 
     $stmtDup = $conn->prepare($sqlDup);
-    $stmtDup->execute([$teacher_t_pid, $subject_code_db, $inspection_time, $academic_year, $semester]);
+    $stmtDup->execute([$teacher_t_pid, $subject_code_db, $inspection_time, $academic_year]);
 
     if ($stmtDup->fetch()) {
         $conn->rollBack();
         echo json_encode([
             'status' => 'duplicate',
             'title'  => 'ไม่สามารถบันทึกได้',
-            'text'   => "ครูคนนี้ได้รับการนิเทศ วิชานี้ ครั้งที่ {$inspection_time} ปีการศึกษา {$academic_year} ภาคเรียนที่ {$semester} แล้ว",
+            'text'   => "ครูคนนี้ได้รับการนิเทศ วิชานี้ ครั้งที่ {$inspection_time} ปีการศึกษา {$academic_year} แล้ว",
             'icon'   => 'warning'
         ]);
         exit;
@@ -68,7 +67,7 @@ try {
     // 3) บันทึก supervision_sessions
     // --------------------------------------------
     $sqlSession = "INSERT INTO supervision_sessions 
-                   (supervisor_p_id, teacher_t_pid, subject_code, subject_name, 
+                   (p_id, t_pid, subject_code, subject_name, 
                     inspection_time, inspection_date, academic_year, semester, 
                     overall_suggestion, supervision_date) 
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
@@ -90,7 +89,7 @@ try {
     // 4) บันทึกคะแนน KPI และข้อเสนอแนะรายตัวชี้วัด
     // --------------------------------------------
     if (!empty($ratings)) {
-        $stmtRating = $conn->prepare("INSERT INTO kpi_answers (question_id, rating_score, supervisor_p_id, teacher_t_pid, subject_code, inspection_time, academic_year) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        $stmtRating = $conn->prepare("INSERT INTO kpi_answers (question_id, rating_score, p_id, t_pid, subject_code, inspection_time, academic_year) VALUES (?, ?, ?, ?, ?, ?, ?)");
         foreach ($ratings as $qid => $score) {
             if ($score === '') continue;
             $stmtRating->execute([(int)$qid, (int)$score, $supervisor_p_id, $teacher_t_pid, $subject_code, $inspection_time, $academic_year]);
@@ -98,7 +97,7 @@ try {
     }
 
     if (!empty($indicator_suggestions)) {
-        $stmtSug = $conn->prepare("INSERT INTO kpi_indicator_suggestions (indicator_id, suggestion_text, supervisor_p_id, teacher_t_pid, subject_code, inspection_time, supervision_date, academic_year) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmtSug = $conn->prepare("INSERT INTO kpi_indicator_suggestions (indicator_id, suggestion_text, p_id, t_pid, subject_code, inspection_time, supervision_date, academic_year) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
         foreach ($indicator_suggestions as $iid => $text) {
             if (trim($text) === '') continue;
             $stmtSug->execute([(int)$iid, trim($text), $supervisor_p_id, $teacher_t_pid, $subject_code, $inspection_time, $inspection_date, $academic_year]);
@@ -112,7 +111,7 @@ try {
     if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
 
     if (isset($_FILES['images']) && !empty($_FILES['images']['tmp_name'][0])) {
-        $stmtImg = $conn->prepare("INSERT INTO images (supervisor_p_id, teacher_t_pid, subject_code, inspection_time, file_name, academic_year, form_type) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        $stmtImg = $conn->prepare("INSERT INTO images (p_id, t_pid, subject_code, inspection_time, file_name, academic_year, form_type) VALUES (?, ?, ?, ?, ?, ?, ?)");
         for ($i = 0; $i < min(2, count($_FILES['images']['tmp_name'])); $i++) {
             if ($_FILES['images']['error'][$i] !== UPLOAD_ERR_OK) continue;
             $ext = strtolower(pathinfo($_FILES['images']['name'][$i], PATHINFO_EXTENSION));
@@ -127,5 +126,16 @@ try {
     echo json_encode(['status' => 'success', 'message' => "✅ บันทึกข้อมูลการนิเทศสำเร็จ"]);
 } catch (Exception $e) {
     if ($conn->inTransaction()) $conn->rollBack();
-    echo json_encode(['status' => 'error', 'message' => 'เกิดข้อผิดพลาด: ' . $e->getMessage()]);
+
+    // ดักจับ Error 1062 (Duplicate entry) เพื่อแสดงข้อความแจ้งเตือนที่เข้าใจง่าย
+    if ($e->getCode() == '23000' && strpos($e->getMessage(), '1062') !== false) {
+        echo json_encode([
+            'status' => 'duplicate',
+            'title'  => 'ข้อมูลซ้ำ',
+            'text'   => "ครูคนนี้ได้รับการนิเทศวิชานี้ครั้งที่ {$inspection_time} ในปีนี้ไปแล้วกรุณากลับไปแก้ไขข้อมูลเบื้องต้น",
+            'icon'   => 'warning'
+        ]);
+    } else {
+        echo json_encode(['status' => 'error', 'message' => 'เกิดข้อผิดพลาด: ' . $e->getMessage()]);
+    }
 }

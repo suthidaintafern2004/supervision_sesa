@@ -166,9 +166,9 @@ $col2  = array_slice($options, $half);
 $sqlImg = "
     SELECT id, file_name
     FROM images
-    WHERE supervisor_p_id = ?
-      AND teacher_t_pid = ?
-      AND form_type = 'qw'  -- ระบุประเภทฟอร์มให้ชัดเจน
+    WHERE p_id = ?
+      AND t_pid = ?
+      AND form_type = 'qw'
       AND (subject_code = '' OR subject_code IS NULL)
       AND (inspection_time = '' OR inspection_time IS NULL)
     ORDER BY id ASC
@@ -193,53 +193,30 @@ $images = $stmtImg->fetchAll(PDO::FETCH_ASSOC);
     <link href="https://cdn.jsdelivr.net/npm/@ttskch/select2-bootstrap-5-theme@1.5.2/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
 
     <style>
-        /* =====================================
-           Select2 ให้เหมือน Bootstrap 5
-        ===================================== */
-
-        .select2-container--bootstrap-5 .select2-selection {
-            min-height: 38px;
-            padding: 0.375rem 0.75rem;
-            border: 1px solid #ced4da;
-            border-radius: 0.375rem;
-            background-color: #fff;
-            font-size: 1rem;
+        .btn-remove-custom {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: rgba(255, 0, 0, 0.8);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+            z-index: 20;
             display: flex;
             align-items: center;
+            justify-content: center;
+            font-weight: bold;
         }
 
-        .select2-container--bootstrap-5 .select2-selection__rendered {
-            padding-left: 0;
-            color: #212529;
-            line-height: normal;
-        }
-
-        .select2-container--bootstrap-5 .select2-selection__arrow {
-            height: 100%;
-        }
-
-        .select2-container--bootstrap-5.select2-container--focus .select2-selection {
-            border-color: #dc3545;
-            box-shadow: 0 0 0 0.25rem rgba(220, 53, 69, .25);
-        }
-
-        .select2-container--bootstrap-5 .select2-search--dropdown .select2-search__field {
-            border: 1px solid #ced4da;
-            border-radius: 0.375rem;
-            padding: 0.375rem 0.75rem;
-        }
-
-        .select2-container--bootstrap-5 .select2-dropdown {
-            border-radius: 0.5rem;
-            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, .15);
-        }
-
-        .select2-container--bootstrap-5 .select2-results__option--highlighted {
-            background-color: #dc3545;
-            color: #fff;
+        .img-container-wrapper {
+            position: relative;
+            display: inline-block;
+            width: 100%;
         }
     </style>
-
 </head>
 
 <body>
@@ -297,12 +274,8 @@ $images = $stmtImg->fetchAll(PDO::FETCH_ASSOC);
                                     <div class="col-md-6">
                                         <label class="text-muted">ภาคเรียน</label>
                                         <select name="semester" class="form-select" required>
-                                            <option value="1" <?= $savedSemester == 1 ? 'selected' : '' ?>>
-                                                ภาคเรียนที่ 1
-                                            </option>
-                                            <option value="2" <?= $savedSemester == 2 ? 'selected' : '' ?>>
-                                                ภาคเรียนที่ 2
-                                            </option>
+                                            <option value="1" <?= $savedSemester == 1 ? 'selected' : '' ?>>ภาคเรียนที่ 1</option>
+                                            <option value="2" <?= $savedSemester == 2 ? 'selected' : '' ?>>ภาคเรียนที่ 2</option>
                                         </select>
                                     </div>
 
@@ -310,66 +283,35 @@ $images = $stmtImg->fetchAll(PDO::FETCH_ASSOC);
                                         <label class="text-muted">ปีการศึกษา</label>
                                         <select name="academic_year" class="form-select" required>
                                             <?php foreach ($academicYears as $year): ?>
-                                                <option value="<?= $year ?>"
-                                                    <?= ($year == $savedAcademicYear) ? 'selected' : '' ?>>
-                                                    <?= $year ?>
-                                                </option>
+                                                <option value="<?= $year ?>" <?= ($year == $savedAcademicYear) ? 'selected' : '' ?>><?= $year ?></option>
                                             <?php endforeach; ?>
                                         </select>
                                     </div>
-
                                 </div>
-
                             </div>
 
-                            <!-- KEY เดิม (สำหรับ WHERE ตอน UPDATE) -->
                             <input type="hidden" name="old_t_pid" value="<?= htmlspecialchars($data['t_pid']) ?>">
                             <input type="hidden" name="old_p_id" value="<?= htmlspecialchars($data['p_id']) ?>">
                             <input type="hidden" name="old_supervision_date" value="<?= htmlspecialchars($data['supervision_date']) ?>">
-
 
                             <div class="mb-4">
                                 <label class="form-label fw-bold text-danger fs-5 mb-3">
                                     <i class="fas fa-list-check"></i> เลือกหัวข้อจุดเน้น (Quick Win) ที่ต้องการนิเทศ
                                 </label>
-
                                 <div class="row">
-                                    <!-- คอลัมน์ซ้าย -->
                                     <div class="col-md-6">
                                         <?php foreach ($col1 as $opt): ?>
                                             <div class="qw-select">
-                                                <input
-                                                    type="checkbox"
-                                                    class="qw-checkbox"
-                                                    id="opt<?= $opt['OptionID'] ?>"
-                                                    name="options[]"
-                                                    value="<?= $opt['OptionID'] ?>"
-                                                    <?= in_array((string)$opt['OptionID'], $savedOptions, true) ? 'checked' : '' ?>>
-                                                <label
-                                                    for="opt<?= $opt['OptionID'] ?>"
-                                                    class="option-text">
-                                                    <?= htmlspecialchars($opt['OptionID'] . '. ' . $opt['OptionText']) ?>
-                                                </label>
+                                                <input type="checkbox" class="qw-checkbox" id="opt<?= $opt['OptionID'] ?>" name="options[]" value="<?= $opt['OptionID'] ?>" <?= in_array((string)$opt['OptionID'], $savedOptions, true) ? 'checked' : '' ?>>
+                                                <label for="opt<?= $opt['OptionID'] ?>" class="option-text"><?= htmlspecialchars($opt['OptionID'] . '. ' . $opt['OptionText']) ?></label>
                                             </div>
                                         <?php endforeach; ?>
                                     </div>
-
-                                    <!-- คอลัมน์ขวา -->
                                     <div class="col-md-6">
                                         <?php foreach ($col2 as $opt): ?>
                                             <div class="qw-select">
-                                                <input
-                                                    type="checkbox"
-                                                    class="qw-checkbox"
-                                                    id="opt<?= $opt['OptionID'] ?>"
-                                                    name="options[]"
-                                                    value="<?= $opt['OptionID'] ?>"
-                                                    <?= in_array((string)$opt['OptionID'], $savedOptions, true) ? 'checked' : '' ?>>
-                                                <label
-                                                    for="opt<?= $opt['OptionID'] ?>"
-                                                    class="option-text">
-                                                    <?= htmlspecialchars($opt['OptionID'] . '. ' . $opt['OptionText']) ?>
-                                                </label>
+                                                <input type="checkbox" class="qw-checkbox" id="opt<?= $opt['OptionID'] ?>" name="options[]" value="<?= $opt['OptionID'] ?>" <?= in_array((string)$opt['OptionID'], $savedOptions, true) ? 'checked' : '' ?>>
+                                                <label for="opt<?= $opt['OptionID'] ?>" class="option-text"><?= htmlspecialchars($opt['OptionID'] . '. ' . $opt['OptionText']) ?></label>
                                             </div>
                                         <?php endforeach; ?>
                                     </div>
@@ -377,111 +319,86 @@ $images = $stmtImg->fetchAll(PDO::FETCH_ASSOC);
                             </div>
 
                             <div class="mb-4">
-                                <label class="form-label fw-bold">
-                                    หรือ อื่นๆ ( กรณีหัวข้อที่ต้องการนิเทศไม่ได้อยู่ในรายการด้านบน )
-                                </label>
-                                <textarea class="form-control"
-                                    name="option_other"
-                                    rows="4"><?= htmlspecialchars($optionOther) ?></textarea>
+                                <label class="form-label fw-bold">อื่นๆ ( กรณีหัวข้อที่ต้องการนิเทศไม่ได้อยู่ในรายการด้านบน )</label>
+                                <textarea class="form-control" name="option_other" rows="4"><?= htmlspecialchars($optionOther) ?></textarea>
                             </div>
 
                             <div class="mb-4">
-                                <label class="form-label fw-bold">
-                                    รูปภาพประกอบ (Quick Win)
-                                </label>
-
-                                <!-- รูปเดิม -->
-                                <div class="row g-3 mb-3">
-                                    <?php foreach ($images as $img): ?>
-                                        <div class="col-md-3 text-center" id="img<?= $img['id'] ?>">
-                                            <img src="../uploads/quickwin/<?= htmlspecialchars($img['file_name']) ?>"
-                                                class="img-fluid rounded shadow-sm"
-                                                style="width: 100%; height: 150px; object-fit: cover;">
-                                            <button type="button"
-                                                class="btn btn-sm btn-outline-danger w-100"
-                                                onclick="deleteImage(<?= $img['id'] ?>)">
-                                                <i class="fas fa-trash"></i> ลบ
-                                            </button>
+                                <label class="form-label fw-bold">รูปภาพประกอบ (Quick Win)</label>
+                                <div class="row g-3 mb-3" id="existingImagesBox">
+                                    <?php foreach ($images as $img) : ?>
+                                        <div class="col-md-3 text-center existing-img-item" id="img<?= $img['id'] ?>">
+                                            <div class="img-container-wrapper">
+                                                <img src="../uploads/quickwin/<?= htmlspecialchars($img['file_name']) ?>" class="img-fluid rounded shadow-sm" style="width: 100%; height: 150px; object-fit: cover;">
+                                                <button type="button" class="btn-remove-custom" onclick="deleteImage(<?= $img['id'] ?>)">×</button>
+                                            </div>
                                         </div>
                                     <?php endforeach; ?>
                                 </div>
 
-                                <!-- เพิ่มรูปใหม่ -->
-                                <input type="file"
-                                    name="quickwin_images[]"
-                                    id="quickwin_images"
-                                    class="form-control"
-                                    accept="image/*"
-                                    multiple>
-
-                                <small class="text-muted">
-                                    เพิ่มได้ไม่เกิน 2 รูป (jpg, png ขนาดไม่เกิน 5MB)
-                                </small>
-
-                                <!-- Preview รูปใหม่ -->
+                                <input type="file" name="quickwin_images[]" id="quickwin_images" class="form-control" accept="image/*" multiple>
+                                <small class="text-muted">เพิ่มได้ไม่เกิน 2 รูป (jpg, png ขนาดไม่เกิน 5MB)</small>
                                 <div class="row g-3 mt-2" id="previewBox"></div>
                             </div>
 
                             <div class="row mt-5">
                                 <div class="col-md-10 mx-auto">
                                     <div class="d-flex justify-content-center gap-3">
-
-                                        <!-- ปุ่มบันทึกสีเขียว -->
                                         <div class="col-md-6 mb-2">
-                                            <button type="submit"
-                                                class="btn btn-success btn-lg w-100 shadow">
-                                                <i class="fas fa-save me-2"></i> บันทึกการแก้ไข
-                                            </button>
+                                            <button type="submit" class="btn btn-success btn-lg w-100 shadow"><i class="fas fa-save me-2"></i> บันทึกการแก้ไข</button>
                                         </div>
-
-                                        <!-- ปุ่มย้อนกลับ (แดงแบบโปร่ง) -->
                                         <div class="col-md-6 mb-2">
-                                            <a href="../my_sessions_list.php"
-                                                class="btn btn-danger btn-lg w-100 shadow">
-                                                <i class="fas fa-arrow-left me-2"></i> ย้อนกลับ
-                                            </a>
+                                            <a href="../my_sessions_list.php" class="btn btn-danger btn-lg w-100 shadow"><i class="fas fa-arrow-left me-2"></i> ย้อนกลับ</a>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-
+                        </div>
+                    </div>
                 </form>
-
             </div>
         </div>
     </div>
-    </div>
-    </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
+        // ฟังก์ชันลบรูปเดิม (หายไปจากจอเฉยๆ และสร้าง input hidden)
+        function deleteImage(id) {
+            const imgDiv = document.getElementById('img' + id);
+            if (imgDiv) {
+                imgDiv.remove(); // ลบออกจากหน้าจอทันที
+            }
 
+            // สร้าง input hidden เพื่อส่ง ID ไปลบใน update_quickwin.php
             const form = document.getElementById('quickwinEditForm');
+            const hiddenInput = document.createElement('input');
+            hiddenInput.type = 'hidden';
+            hiddenInput.name = 'delete_image_ids[]';
+            hiddenInput.value = id;
+            form.appendChild(hiddenInput);
+        }
 
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.getElementById('quickwinEditForm');
             form.addEventListener('submit', function(e) {
-
                 const checkedCount = document.querySelectorAll('.qw-checkbox:checked').length;
                 const otherText = document.querySelector('textarea[name="option_other"]').value.trim();
 
                 if (checkedCount === 0 && otherText === '') {
                     e.preventDefault();
-
                     Swal.fire({
                         icon: 'warning',
                         title: 'กรุณาเลือกหัวข้อ',
                         text: 'กรุณาเลือกหัวข้อ Quick Win อย่างน้อย 1 ข้อ หรือระบุหัวข้ออื่น',
                         confirmButtonColor: '#dc3545'
                     });
-
                     return;
                 }
 
                 e.preventDefault();
-
                 Swal.fire({
                     icon: 'question',
                     title: 'ยืนยันการบันทึก',
@@ -496,129 +413,83 @@ $images = $stmtImg->fetchAll(PDO::FETCH_ASSOC);
                         form.submit();
                     }
                 });
-
             });
 
-        });
-    </script>
-
-    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-
-    <script>
-        $(document).ready(function() {
-
+            // Select2
             $('.select-search').select2({
                 theme: 'bootstrap-5',
                 width: '100%',
-                placeholder: 'เลือกหรือพิมพ์ค้นหาชื่อครู',
-                minimumInputLength: 0,
-                dropdownParent: $('#quickwinEditForm'),
                 ajax: {
                     url: 'quickwin_edit.php?ajax=search_teacher',
                     dataType: 'json',
                     delay: 250,
-                    data: function(params) {
-                        return {
-                            q: params.term || ''
-                        };
-                    },
-                    processResults: function(data) {
-                        return data;
-                    },
+                    data: params => ({
+                        q: params.term || ''
+                    }),
+                    processResults: data => data,
                     cache: true
                 }
             });
-
         });
-    </script>
 
-    <script>
+        // จัดการรูปใหม่
         const input = document.getElementById('quickwin_images');
         const previewBox = document.getElementById('previewBox');
+        let newFiles = [];
 
-        input.addEventListener('change', () => {
+        function updateFileInput() {
+            const dataTransfer = new DataTransfer();
+            newFiles.forEach(file => dataTransfer.items.add(file));
+            input.files = dataTransfer.files;
+        }
+
+        function renderPreviews() {
             previewBox.innerHTML = '';
-
-            if (input.files.length > 2) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'เลือกรูปได้ไม่เกิน 2 รูป',
-                    confirmButtonColor: '#dc3545'
-                });
-                input.value = '';
-                return;
-            }
-
-            [...input.files].forEach(file => {
+            newFiles.forEach((file, index) => {
                 const reader = new FileReader();
                 reader.onload = e => {
                     const div = document.createElement('div');
-                    div.className = 'col-md-3';
+                    div.className = 'col-md-3 position-relative';
                     div.innerHTML = `
-                <img src="${e.target.result}"
-                     class="img-thumbnail"
-                     style="height:120px; object-fit:cover;">
-            `;
+                        <div class="img-container-wrapper">
+                            <img src="${e.target.result}" class="img-fluid rounded shadow-sm" style="width: 100%; height: 150px; object-fit: cover;">
+                            <button type="button" class="btn-remove-custom" onclick="removeNewFile(${index})">×</button>
+                            <span class="badge bg-primary position-absolute top-0 start-0 m-2">ใหม่</span>
+                        </div>
+                    `;
                     previewBox.appendChild(div);
                 };
                 reader.readAsDataURL(file);
             });
+        }
+
+        function removeNewFile(index) {
+            newFiles.splice(index, 1);
+            updateFileInput();
+            renderPreviews();
+        }
+
+        input.addEventListener('change', function() {
+            const filesFromInput = Array.from(this.files);
+            const existingImageCount = document.querySelectorAll('.existing-img-item').length;
+            const maxTotalImages = 2;
+
+            if (existingImageCount + newFiles.length + filesFromInput.length > maxTotalImages) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'เลือกรูปได้ไม่เกิน ' + maxTotalImages + ' รูป',
+                    text: 'จำนวนรูปเกินกำหนด กรุณาลบรูปเดิมออกก่อน',
+                    confirmButtonColor: '#dc3545'
+                });
+                this.value = '';
+                return;
+            }
+            newFiles = [...newFiles, ...filesFromInput];
+            this.value = '';
+            updateFileInput();
+            renderPreviews();
         });
     </script>
-
-    <script>
-        function deleteImage(id) {
-            Swal.fire({
-                title: 'ยืนยันการลบรูปนี้?',
-                text: "รูปจะยังไม่ถูกลบจริงจนกว่าคุณจะกดปุ่ม 'บันทึกการแก้ไข'",
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonText: 'ตกลง',
-                cancelButtonText: 'ยกเลิก',
-                confirmButtonColor: '#dc3545'
-            }).then(result => {
-                if (result.isConfirmed) {
-                    // 1. ซ่อน Element รูปในหน้าจอ
-                    const imgElement = document.getElementById('img' + id);
-                    if (imgElement) {
-                        imgElement.style.display = 'none';
-                    }
-
-                    // 2. สร้าง input hidden เพื่อส่ง ID ไปให้ไฟล์ update_quickwin.php
-                    const form = document.getElementById('quickwinEditForm');
-                    const input = document.createElement('input');
-                    input.type = 'hidden';
-                    input.name = 'delete_image_ids[]'; // ส่งเป็น Array
-                    input.value = id;
-                    form.appendChild(input);
-                }
-            });
-        }
-    </script>
-
-    <?php
-    // ตรวจสอบว่ามีข้อความ Flash และต้องไม่ใช่ข้อความที่มาจากการบันทึก (quickwin_save)
-    if (!empty($_SESSION['flash_message']) && ($_SESSION['flash_from'] ?? '') !== 'quickwin_save'):
-    ?>
-        <script>
-            Swal.fire({
-                icon: '<?= $_SESSION['flash_type'] ?>',
-                title: 'แจ้งเตือน',
-                text: '<?= addslashes($_SESSION['flash_message']) ?>',
-                confirmButtonColor: '#dc3545'
-            });
-        </script>
-    <?php
-        // ล้างค่าทิ้งทันทีหลังแสดงผล
-        unset($_SESSION['flash_message'], $_SESSION['flash_type'], $_SESSION['flash_from']);
-    endif;
-
-    // กรณีที่เป็นการบันทึกสำเร็จ (มาจาก quickwin_save) ให้ล้างค่าทิ้งเงียบๆ ไม่ต้องแสดง alert ซ้ำ
-    if (($_SESSION['flash_from'] ?? '') === 'quickwin_save') {
-        unset($_SESSION['flash_message'], $_SESSION['flash_type'], $_SESSION['flash_from']);
-    }
-    ?>
 </body>
 
 </html>
