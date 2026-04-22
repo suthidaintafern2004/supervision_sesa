@@ -3,7 +3,10 @@
    save_quickwin_data.php (ฉบับแก้ไขชื่อฟิลด์ตามฐานข้อมูลใหม่)
    ================================================== */
 
+header('Content-Type: application/json; charset=utf-8');
 require_once __DIR__ . '/../config/session_config.php';
+
+date_default_timezone_set('Asia/Bangkok');
 
 if (file_exists('../config/db_connect.php')) {
     require_once '../config/db_connect.php';
@@ -17,14 +20,6 @@ if (!is_dir($uploadDir)) {
     mkdir($uploadDir, 0755, true);
 }
 
-function redirect_with_flash_message($message, $location, $type = 'warning')
-{
-    $_SESSION['flash_message'] = $message;
-    $_SESSION['flash_type']    = $type;
-    header("Location: {$location}");
-    exit();
-}
-
 function getAcademicYear($date)
 {
     $year  = (int)date('Y', strtotime($date));
@@ -33,12 +28,13 @@ function getAcademicYear($date)
 }
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    header('Location: ../index.php');
+    echo json_encode(['status' => 'error', 'message' => 'Invalid request method']);
     exit();
 }
 
 if (!isset($_SESSION['inspection_data'])) {
-    redirect_with_flash_message('Session หมดอายุ กรุณาทำรายการใหม่', '../index.php', 'warning');
+    echo json_encode(['status' => 'error', 'message' => 'Session หมดอายุ กรุณาทำรายการใหม่']);
+    exit();
 }
 
 /* =========================
@@ -57,7 +53,8 @@ if ($academic_year < 2500) {
 }
 
 if ($p_id === '' || $t_pid === '' || $semester === 0 || (empty($option_ids) && $option_other === '')) {
-    redirect_with_flash_message('กรุณาเลือกหัวข้อ Quick Win หรือระบุหัวข้ออื่น ๆ', 'quickwin_form.php', 'warning');
+    echo json_encode(['status' => 'error', 'message' => 'กรุณาเลือกหัวข้อ Quick Win หรือระบุหัวข้ออื่น ๆ']);
+    exit();
 }
 
 /* =========================
@@ -67,7 +64,8 @@ $check_stmt = $conn->prepare("SELECT COUNT(*) FROM quick_win WHERE t_pid = :t_pi
 $check_stmt->execute([':t_pid' => $t_pid, ':academic_year' => $academic_year]);
 
 if ($check_stmt->fetchColumn() > 0) {
-    redirect_with_flash_message("ครูท่านนี้ได้รับการนิเทศ Quick Win ปีการศึกษา {$academic_year} แล้ว", '../index.php', 'warning');
+    echo json_encode(['status' => 'error', 'message' => "ครูท่านนี้ได้รับการนิเทศ Quick Win ปีการศึกษา {$academic_year} แล้ว"]);
+    exit();
 }
 
 $options_str = !empty($option_ids) ? implode('/', $option_ids) : '';
@@ -122,11 +120,17 @@ try {
 
     $conn->commit();
     unset($_SESSION['inspection_data']);
-    $_SESSION['flash_from'] = 'quickwin_save';
 
-    redirect_with_flash_message("บันทึก Quick Win สำเร็จ", '../index.php', 'success');
+    echo json_encode(['status' => 'success', 'message' => 'บันทึก Quick Win สำเร็จ']);
+    exit;
 } catch (PDOException $e) {
     if ($conn->inTransaction()) $conn->rollBack();
-    echo "พบปัญหา SQL: " . $e->getMessage();
+    
+    $errorMsg = 'เกิดข้อผิดพลาด ไม่สามารถบันทึกข้อมูล Quick Win ได้';
+    if ($e->getCode() == '23000') {
+        $errorMsg = 'ข้อมูลซ้ำ! ครูท่านนี้ได้รับการประเมินจุดเน้นในปีการศึกษานี้ไปแล้ว';
+    }
+    
+    echo json_encode(['status' => 'error', 'message' => $errorMsg]);
     exit;
 }

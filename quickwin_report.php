@@ -3,6 +3,8 @@
 session_start();
 require_once 'config/db_connect.php';
 
+date_default_timezone_set('Asia/Bangkok');
+
 // รับ Composite Key จาก POST หรือ GET
 $p_id = $_POST['p_id'] ?? $_GET['p_id'] ?? null;
 $t_id = $_POST['t_id'] ?? $_GET['t_id'] ?? null;
@@ -113,6 +115,7 @@ $sql_images = "SELECT file_name
                FROM images 
                WHERE p_id = :p_id 
                  AND t_pid = :t_id 
+                 AND academic_year = :academic_year
                  AND form_type = 'qw'
                  AND (subject_code = '' OR subject_code IS NULL)
                  AND (inspection_time = '' OR inspection_time IS NULL)
@@ -121,7 +124,8 @@ $sql_images = "SELECT file_name
 $stmt_img = $conn->prepare($sql_images);
 $stmt_img->execute([
     ':p_id' => $p_id,
-    ':t_id' => $t_id
+    ':t_id' => $t_id,
+    ':academic_year' => $academic_year
 ]);
 $images = $stmt_img->fetchAll(PDO::FETCH_ASSOC);
 ?>

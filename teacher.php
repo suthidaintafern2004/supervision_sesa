@@ -79,7 +79,15 @@
             const searchTerm = teacherInput.value.trim().toLowerCase();
 
             if (!searchTerm) {
-                alert("กรุณากรอกชื่อก่อนค้นหา");
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'แจ้งเตือน',
+                    text: 'กรุณากรอกชื่อก่อนค้นหา',
+                    showCloseButton: true,
+                    confirmButtonText: 'ตกลง',
+                    timer: 5000,
+                    timerProgressBar: true
+                });
                 return;
             }
 
@@ -91,7 +99,15 @@
 
             if (results.length === 0) {
                 resultBox.style.display = "none";
-                alert("ไม่พบรายชื่อที่ค้นหา");
+                Swal.fire({
+                    icon: 'info',
+                    title: 'แจ้งเตือน',
+                    text: 'ไม่พบรายชื่อที่ค้นหา',
+                    showCloseButton: true,
+                    confirmButtonText: 'ตกลง',
+                    timer: 5000,
+                    timerProgressBar: true
+                });
                 return;
             }
 

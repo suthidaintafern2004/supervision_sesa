@@ -12,13 +12,6 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-function getAcademicYearFromDate(string $date): int
-{
-    $y = (int)date('Y', strtotime($date));
-    $m = (int)date('n', strtotime($date));
-    return ($m >= 5) ? $y + 543 : $y + 542;
-}
-
 require_once __DIR__ . '/../config/db_connect.php';
 
 /* ==================================================
@@ -47,7 +40,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             's_pid'    => $_POST['s_pid'],
             't_pid'    => $_POST['t_pid'],
             'sub_code' => $_POST['sub_code'],
-            'time'     => $_POST['time']
+            'time'     => $_POST['time'],
+            'academic_year' => $_POST['academic_year'] ?? ''
         ];
     }
 
@@ -62,7 +56,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION['quickwin_context'] = [
             't_pid' => $_POST['t_pid'],
             'p_id'  => $_POST['p_id'],
-            'date'  => $_POST['date']
+            'date'  => $_POST['date'],
+            'academic_year' => $_POST['academic_year'] ?? ''
         ];
     }
 
@@ -115,6 +110,7 @@ if ($mode === 'normal') {
           AND ss.t_pid   = ?
           AND ss.subject_code    = ?
           AND ss.inspection_time = ?
+          AND ss.academic_year   = ?
           AND ss.deleted_at IS NULL
         LIMIT 1
     ";
@@ -124,7 +120,8 @@ if ($mode === 'normal') {
         $data['s_pid'],
         $data['t_pid'],
         $data['sub_code'],
-        (int)$data['time']
+        (int)$data['time'],
+        $data['academic_year']
     ]);
 
     $session_info = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -166,7 +163,7 @@ if ($mode === 'quickwin') {
         $data['t_pid'],
         $data['p_id'],
         $data['date'],
-        getAcademicYearFromDate($data['date'])
+        $data['academic_year']
     ]);
 
     $session_info = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -409,6 +406,8 @@ $questions = $q->fetchAll(PDO::FETCH_ASSOC);
 
 <body>
 
+    <?php $nav_prefix = '../'; include '../navbar.php'; ?>
+
     <div class="container my-5">
         <div class="card form-card shadow-sm">
 
@@ -472,7 +471,7 @@ $questions = $q->fetchAll(PDO::FETCH_ASSOC);
                                     <span class="question-number">
                                         <?= (int)$q['id'] ?>.
                                     </span>
-                                    <?= htmlspecialchars($q['question_text']) ?>
+                                    <?= htmlspecialchars($q['question_text']) ?> <span class="text-danger">*</span>
                                 </div>
 
                                 <div class="rating-group">
@@ -546,7 +545,29 @@ $questions = $q->fetchAll(PDO::FETCH_ASSOC);
                     confirmButtonText: 'ตกลง',
                     confirmButtonColor: '#dc3545'
                 });
+                return;
             }
+            
+            e.preventDefault();
+            Swal.fire({
+                title: 'กำลังบันทึก...',
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+
+            const formData = new FormData(e.target);
+            fetch('save_satisfaction.php', { method: 'POST', body: formData })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        window.location.href = data.redirect;
+                    } else {
+                        Swal.fire({ icon: 'error', title: 'พบข้อผิดพลาด', text: data.message, confirmButtonText: 'ตกลง' });
+                    }
+                })
+                .catch(error => Swal.fire('ข้อผิดพลาด', 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้', 'error'));
         });
     </script>
 

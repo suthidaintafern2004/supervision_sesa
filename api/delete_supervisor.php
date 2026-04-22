@@ -26,10 +26,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     try {
         // เช็คประวัติการนิเทศ
-        $chk = $conn->prepare("SELECT COUNT(*) FROM supervision_sessions WHERE supervisor_p_id = :pid");
+        $chk = $conn->prepare("SELECT COUNT(*) FROM supervision_sessions WHERE p_id = :pid");
         $chk->execute([':pid' => $p_id]);
         if ($chk->fetchColumn() > 0) {
             echo json_encode(['success' => false, 'message' => 'ลบไม่ได้: ผู้นิเทศท่านนี้มีประวัติการนิเทศแล้ว']);
+            exit;
+        }
+
+        // เช็คประวัติ Quick Win
+        $chkQW = $conn->prepare("SELECT COUNT(*) FROM quick_win WHERE p_id = :pid");
+        $chkQW->execute([':pid' => $p_id]);
+        if ($chkQW->fetchColumn() > 0) {
+            echo json_encode(['success' => false, 'message' => 'ลบไม่ได้: ผู้นิเทศท่านนี้มีประวัติการนิเทศ Quick Win แล้ว']);
             exit;
         }
 

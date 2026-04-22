@@ -14,12 +14,20 @@ if (!$t_pid || !preg_match('/^\d{13}$/', $t_pid)) {
 
 try {
     // ตรวจสอบว่าครูคนนี้มีประวัติการนิเทศหรือยัง
-    $check = $conn->prepare("SELECT COUNT(*) AS cnt FROM supervision_sessions WHERE teacher_t_pid = :pid");
+    $check = $conn->prepare("SELECT COUNT(*) AS cnt FROM supervision_sessions WHERE t_pid = :pid");
     $check->execute([':pid' => $t_pid]);
     $count = $check->fetch()['cnt'];
 
     if ($count > 0) {
         echo json_encode(['success' => false, 'message' => 'ไม่สามารถลบได้ เนื่องจากมีประวัติการนิเทศแล้ว']);
+        exit;
+    }
+
+    // ตรวจสอบว่าครูคนนี้มีประวัติ Quick Win หรือยัง
+    $checkQW = $conn->prepare("SELECT COUNT(*) AS cnt FROM quick_win WHERE t_pid = :pid");
+    $checkQW->execute([':pid' => $t_pid]);
+    if ($checkQW->fetch()['cnt'] > 0) {
+        echo json_encode(['success' => false, 'message' => 'ไม่สามารถลบได้ เนื่องจากมีประวัติการนิเทศ Quick Win แล้ว']);
         exit;
     }
 

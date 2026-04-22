@@ -47,10 +47,53 @@ require_once 'config/db_connect.php';
         .display-field {
             background: #f8f9fa;
         }
+        
+        /* Modern Buttons */
+        .btn-modern-back {
+            background: transparent;
+            color: #dc3545;
+            border: 2px solid #dc3545;
+            border-radius: 30px;
+            padding: 10px 30px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn-modern-back:hover {
+            background: #dc3545;
+            color: #fff;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(220, 53, 69, 0.3);
+        }
+
+        .btn-modern-next {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: #fff;
+            border: none;
+            border-radius: 30px;
+            padding: 10px 30px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(40, 167, 69, 0.3);
+        }
+        .btn-modern-next:hover {
+            background: linear-gradient(135deg, #218838, #1e7e34);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(40, 167, 69, 0.4);
+        }
     </style>
 </head>
 
-<body>
+<body class="bg-light">
+
+    <?php include 'navbar.php'; ?>
+
     <div class="container my-4">
         <div class="main-card card">
             <div class="form-header card-header text-center">
@@ -123,14 +166,14 @@ require_once 'config/db_connect.php';
                         </div>
 
                         <div class="col-auto">
-                            <a href="index.php" class="btn btn-danger">
-                                <i class="fas fa-arrow-left"></i> ย้อนกลับ
+                            <a href="index.php" class="btn-modern-back">
+                                BACK
                             </a>
                         </div>
 
                         <div class="col-auto">
-                            <button type="submit" class="btn btn-success btn-l">
-                                ดำเนินการต่อ
+                            <button type="submit" class="btn-modern-next">
+                                CONTINUE
                             </button>
                         </div>
                     </div>
@@ -149,15 +192,23 @@ require_once 'config/db_connect.php';
             let msg = '';
 
             if (teacherName === '' || teacherPid === '') {
-                msg += '- กรุณาเลือก "ผู้รับนิเทศ" จากรายชื่อที่ระบบแนะนำ\n';
+                msg += '- กรุณาเลือก "ผู้รับนิเทศ" จากรายชื่อที่ระบบแนะนำ<br>';
             }
 
             if (!formType) {
-                msg += '- กรุณาเลือก "แบบฟอร์มการนิเทศ"\n';
+                msg += '- กรุณาเลือก "แบบฟอร์มการนิเทศ"<br>';
             }
 
             if (msg !== '') {
-                alert('ข้อมูลไม่ครบถ้วน:\n' + msg);
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'ข้อมูลไม่ครบถ้วน',
+                    html: msg,
+                    showCloseButton: true,
+                    confirmButtonText: 'ตกลง',
+                    timer: 5000,
+                    timerProgressBar: true
+                });
                 e.preventDefault();
                 return false;
             }
@@ -197,7 +248,10 @@ require_once 'config/db_connect.php';
                 icon: <?= json_encode($_SESSION['flash_type'] ?? 'warning') ?>,
                 title: 'แจ้งเตือน',
                 text: <?= json_encode($_SESSION['flash_message']) ?>,
-                confirmButtonText: 'รับทราบ'
+                confirmButtonText: 'รับทราบ',
+                showCloseButton: true,
+                timer: 5000,
+                timerProgressBar: true
             });
         </script>
     <?php
@@ -210,9 +264,6 @@ require_once 'config/db_connect.php';
     endif;
     ?>
 
-
-
-    <?php include 'footer.php'; ?>
 </body>
 
 </html>

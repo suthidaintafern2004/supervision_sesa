@@ -4,6 +4,9 @@
 // ===========================================
 header('Content-Type: application/json');
 require_once __DIR__ . '/config/session_config.php'; // กำหนดให้ส่งค่ากลับเป็น JSON
+
+date_default_timezone_set('Asia/Bangkok');
+
 error_reporting(E_ALL);
 ini_set('display_errors', 0); // ปิดการแสดง error โดยตรงเพื่อไม่ให้ขัดขวาง JSON
 
@@ -14,6 +17,45 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 require_once __DIR__ . '/config/db_connect.php';
+
+/* =========================================================
+   MIGRATION: อัปเดตโครงสร้างฐานข้อมูลเพื่อแก้ปัญหา Error 1062 ข้อมูลซ้ำข้ามปี
+========================================================= */
+try {
+    $idx_stmt = $conn->query("SHOW INDEX FROM supervision_sessions WHERE Non_unique = 0 AND Key_name != 'PRIMARY'");
+    $indexes = [];
+    if ($idx_stmt) {
+        while ($row = $idx_stmt->fetch(PDO::FETCH_ASSOC)) {
+            $indexes[$row['Key_name']][] = $row['Column_name'];
+        }
+        $has_correct_index = false;
+        $wrong_indexes = [];
+        
+        foreach ($indexes as $key_name => $columns) {
+            if (in_array('t_pid', $columns) && in_array('subject_code', $columns) && in_array('inspection_time', $columns)) {
+                if (!in_array('academic_year', $columns)) {
+                    $wrong_indexes[] = $key_name; // เก็บชื่อ Index ที่ผิดไว้ก่อน
+                } else {
+                    $has_correct_index = true; // มี index ที่ถูกต้องอยู่แล้ว
+                }
+            }
+        }
+        
+        // 1. สร้าง Index ที่ถูกต้องก่อน (ป้องกัน Foreign Key error)
+        if (!$has_correct_index) {
+            try {
+                $conn->exec("ALTER TABLE `supervision_sessions` ADD UNIQUE KEY `uk_session_yearly` (`t_pid`, `subject_code`, `inspection_time`, `academic_year`)");
+            } catch (Exception $e) { }
+        }
+        
+        // 2. ค่อยลบ Index เก่าทิ้งทีหลัง
+        foreach ($wrong_indexes as $wrong_key) {
+            try {
+                $conn->exec("ALTER TABLE `supervision_sessions` DROP INDEX `$wrong_key`");
+            } catch (Exception $e) { }
+        }
+    }
+} catch (Exception $e) {}
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     echo json_encode(['status' => 'error', 'message' => 'Invalid request method']);
@@ -37,6 +79,8 @@ $semester        = (int)($_POST['semester'] ?? 0);
 
 $subject_code_db = preg_replace('/\s+/', '', strtolower($subject_code));
 
+$current_datetime = date('Y-m-d H:i:s');
+
 try {
     $conn->beginTransaction();
 
@@ -47,7 +91,8 @@ try {
                WHERE t_pid = ? 
                AND REPLACE(LOWER(subject_code),' ','') = ? 
                AND inspection_time = ? 
-               AND academic_year = ? LIMIT 1";
+               AND academic_year = ? 
+               AND deleted_at IS NULL LIMIT 1";
 
     $stmtDup = $conn->prepare($sqlDup);
     $stmtDup->execute([$teacher_t_pid, $subject_code_db, $inspection_time, $academic_year]);
@@ -70,7 +115,7 @@ try {
                    (p_id, t_pid, subject_code, subject_name, 
                     inspection_time, inspection_date, academic_year, semester, 
                     overall_suggestion, supervision_date) 
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
     $stmtSession = $conn->prepare($sqlSession);
     $stmtSession->execute([
@@ -82,7 +127,8 @@ try {
         $inspection_date,
         $academic_year,
         $semester,
-        $overall_suggestion
+        $overall_suggestion,
+        $current_datetime
     ]);
 
     // --------------------------------------------
@@ -132,7 +178,7 @@ try {
         echo json_encode([
             'status' => 'duplicate',
             'title'  => 'ข้อมูลซ้ำ',
-            'text'   => "ครูคนนี้ได้รับการนิเทศวิชานี้ครั้งที่ {$inspection_time} ในปีนี้ไปแล้วกรุณากลับไปแก้ไขข้อมูลเบื้องต้น",
+            'text'   => "ครูคนนี้ได้รับการนิเทศวิชานี้ครั้งที่ {$inspection_time} ปีการศึกษา {$academic_year} ไปแล้วกรุณากลับไปแก้ไขข้อมูลเบื้องต้น",
             'icon'   => 'warning'
         ]);
     } else {

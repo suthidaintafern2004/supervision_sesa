@@ -258,6 +258,8 @@ $existing_images_db = $stmt->fetchAll(PDO::FETCH_ASSOC);
 </head>
 
 <body class="bg-light">
+    <?php $nav_prefix = '../'; include '../navbar.php'; ?>
+
     <div class="container py-5">
 
         <form id="evaluationForm" method="POST" action="update_kpi_data.php" enctype="multipart/form-data">
@@ -370,17 +372,27 @@ $existing_images_db = $stmt->fetchAll(PDO::FETCH_ASSOC);
             <div class="card shadow-sm border-0 mb-4 rounded-4">
                 <div class="card-header bg-white fw-bold py-3">📷 รูปภาพกิจกรรม</div>
                 <div class="card-body">
-                    <div class="d-flex gap-3 flex-wrap mb-3" id="imageContainer">
-                        <?php foreach ($existing_images_db as $img): ?>
-                            <div class="img-item existing-img">
-                                <img src="../uploads/<?= htmlspecialchars($img['file_name']) ?>" class="kpi-image">
-                                <input type="hidden" name="existing_images[<?= $img['id'] ?>][file_name]" value="<?= htmlspecialchars($img['file_name']) ?>">
-                                <button type="button" class="btn-remove-custom" onclick="this.parentElement.remove()">×</button>
-                            </div>
-                        <?php endforeach; ?>
+                    <div class="d-flex gap-3 flex-wrap align-items-start">
+                        <div class="d-flex gap-3 flex-wrap" id="imageContainer">
+                            <?php foreach ($existing_images_db as $img): ?>
+                                <div class="img-item existing-img">
+                                    <img src="../uploads/<?= htmlspecialchars($img['file_name']) ?>" class="kpi-image">
+                                    <input type="hidden" name="existing_images[<?= $img['id'] ?>][file_name]" value="<?= htmlspecialchars($img['file_name']) ?>">
+                                    <button type="button" class="btn-remove-custom" onclick="removeExistingImage(this)">×</button>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                        
+                        <div class="d-flex gap-3 flex-wrap" id="newImageContainer"></div>
                     </div>
-                    <input type="file" id="imageInput" name="images[]" class="form-control mb-3" accept="image/*" multiple onchange="previewNewImages(this)">
-                    <div class="d-flex gap-3 flex-wrap" id="newImageContainer"></div>
+                    
+                    <input type="file" id="imageInput" name="images[]" class="form-control mb-3" accept="image/*" multiple style="display: none;">
+                    <div class="d-flex align-items-center mt-3">
+                        <button type="button" id="selectImageBtn" class="btn btn-outline-primary" onclick="document.getElementById('imageInput').click()">
+                            <i class="fas fa-plus"></i> เลือกรูปภาพ
+                        </button>
+                        <small class="text-muted ms-3">* รองรับไฟล์ .jpg, .png (รวมรูปเดิมและรูปใหม่ไม่เกิน 2 รูป)</small>
+                    </div>
                 </div>
             </div>
 
@@ -402,6 +414,8 @@ $existing_images_db = $stmt->fetchAll(PDO::FETCH_ASSOC);
         });
 
         function confirmSave() {
+            updateInputFiles(); // ให้แน่ใจว่าไฟล์ที่เลือกไว้ล่าสุดถูกอัปเดตลง input
+            
             Swal.fire({
                 title: 'ยืนยันการแก้ไข?',
                 text: "คุณต้องการบันทึกข้อมูลที่แก้ไขใช่หรือไม่",
@@ -409,32 +423,108 @@ $existing_images_db = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 showCancelButton: true,
                 confirmButtonText: 'บันทึก',
                 cancelButtonText: 'ยกเลิก'
-            }).then((result) => {
+            }).then(async (result) => {
                 if (result.isConfirmed) {
-                    document.getElementById('evaluationForm').submit();
+                    Swal.fire({
+                        title: 'กำลังบันทึก...',
+                        allowOutsideClick: false,
+                        didOpen: () => {
+                            Swal.showLoading();
+                        }
+                    });
+                    
+                    const form = document.getElementById('evaluationForm');
+                    const formData = new FormData(form);
+                    
+                    try {
+                        const response = await fetch('update_kpi_data.php', { method: 'POST', body: formData });
+                        const resultData = await response.json();
+                        
+                        if (resultData.status === 'success') {
+                            Swal.fire({ icon: 'success', title: 'สำเร็จ', text: resultData.message, timer: 2000, showConfirmButton: false }).then(() => {
+                                window.location.href = '../my_sessions_list.php?success=update';
+                            });
+                        } else {
+                            Swal.fire({ icon: 'error', title: 'พบข้อผิดพลาด', text: resultData.message, confirmButtonText: 'ตกลง' });
+                        }
+                    } catch (error) {
+                        Swal.fire('ข้อผิดพลาด', 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้', 'error');
+                    }
                 }
             });
         }
 
-        function previewNewImages(input) {
-            const container = document.getElementById('newImageContainer');
-            container.innerHTML = ''; // ล้างรูปเก่าที่เคยเลือกไว้ (ถ้ามี)
+        // ระบบจัดการรูปภาพ (จำกัด 2 รูป รวมของเก่า)
+        let selectedFiles = [];
+        const imageInput = document.getElementById('imageInput');
+        const newImageContainer = document.getElementById('newImageContainer');
+        const selectImageBtn = document.getElementById('selectImageBtn');
 
-            if (input.files) {
-                Array.from(input.files).forEach(file => {
-                    if (file.type.startsWith('image/')) {
-                        const reader = new FileReader();
-                        reader.onload = function(e) {
-                            const div = document.createElement('div');
-                            div.className = 'img-item';
-                            div.innerHTML = `<img src="${e.target.result}" class="kpi-image">`;
-                            container.appendChild(div);
-                        }
-                        reader.readAsDataURL(file);
-                    }
-                });
+        function countExistingImages() {
+            return document.querySelectorAll('.existing-img').length;
+        }
+
+        function checkImageLimit() {
+            const total = countExistingImages() + selectedFiles.length;
+            if (total >= 2) {
+                selectImageBtn.style.display = 'none';
+            } else {
+                selectImageBtn.style.display = 'inline-block';
             }
         }
+
+        function removeExistingImage(btn) {
+            btn.parentElement.remove();
+            checkImageLimit();
+        }
+
+        imageInput.addEventListener('change', function() {
+            const newFiles = Array.from(this.files);
+            for (let file of newFiles) {
+                if (!file.type.startsWith('image/')) continue;
+                if (countExistingImages() + selectedFiles.length >= 2) {
+                    Swal.fire('จำกัดรูปภาพ', 'สามารถอัปโหลดและเก็บรูปภาพได้ไม่เกิน 2 รูป กรุณาลบรูปเดิมทิ้งก่อนเพิ่มรูปใหม่', 'warning');
+                    break;
+                }
+                selectedFiles.push(file);
+            }
+            updateInputFiles();
+            renderNewImagesPreview();
+            checkImageLimit();
+        });
+
+        function renderNewImagesPreview() {
+            newImageContainer.innerHTML = '';
+            selectedFiles.forEach((file, index) => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const div = document.createElement('div');
+                    div.className = 'img-item new-img position-relative';
+                    div.innerHTML = `
+                        <img src="${e.target.result}" class="kpi-image">
+                        <button type="button" class="btn-remove-custom" onclick="removeNewImage(${index})">×</button>
+                    `;
+                    newImageContainer.appendChild(div);
+                }
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function removeNewImage(index) {
+            selectedFiles.splice(index, 1);
+            updateInputFiles();
+            renderNewImagesPreview();
+            checkImageLimit();
+        }
+
+        function updateInputFiles() {
+            const dataTransfer = new DataTransfer();
+            selectedFiles.forEach(file => dataTransfer.items.add(file));
+            imageInput.files = dataTransfer.files;
+        }
+
+        // ทำงานเมื่อโหลดหน้าครั้งแรก
+        checkImageLimit();
     </script>
 </body>
 

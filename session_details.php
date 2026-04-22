@@ -7,6 +7,8 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+date_default_timezone_set('Asia/Bangkok');
+
 require_once __DIR__ . '/config/db_connect.php';
 
 /* ===============================
@@ -76,6 +78,7 @@ try {
                 ss.inspection_time AS time_info,
                 ss.subject_name AS topic,
                 CONCAT(IFNULL(p.prefix_name,''), s.fname, ' ', s.lname) AS supervisor_full_name,
+                ss.academic_year,
 
                 (
                     SELECT COUNT(*)
@@ -94,6 +97,7 @@ try {
                       AND sa.t_pid   = ss.t_pid
                       AND sa.subject_code    = ss.subject_code
                       AND sa.inspection_time = ss.inspection_time
+                      AND sa.academic_year   = ss.academic_year
                 ) THEN 1 ELSE 0 END) AS status,
 
                 NULL AS qw_t_id,
@@ -118,8 +122,9 @@ try {
                     'quickwin' AS session_type,
                     qw.supervision_date,
                     '-' AS time_info,
-                    qo.OptionText AS topic,
+                    'การประเมินจุดเน้น' AS topic,
                     CONCAT(IFNULL(p.prefix_name,''), s.fname, ' ', s.lname) AS supervisor_full_name,
+                    qw.academic_year,
                     0 AS kpi_count,
 
                     /* ✅ ตรวจจากตารางคำตอบจริง */
@@ -128,7 +133,7 @@ try {
                         FROM quickwin_satisfaction_answers saq
                         WHERE saq.t_pid = qw.t_pid
                         AND saq.p_id = qw.p_id
-                        AND saq.supervision_date = qw.supervision_date
+                        AND saq.academic_year = qw.academic_year
                     ) THEN 1 ELSE 0 END) AS status,
 
                     qw.t_pid AS qw_t_id,
@@ -173,14 +178,69 @@ try {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <link rel="stylesheet" href="css/styles.css">
     <style>
+        :root {
+            --warm-primary: #e76f51; /* สีส้มอมแดง สบายตา */
+            --warm-secondary: #ff8c42; /* สีส้มสว่าง (เข้ากับ Footer) */
+            --warm-light: #ffe8d6; /* สีพื้นหลังอ่อนๆ */
+            --warm-hover: #d65d40; /* สีตอนนำเมาส์ไปชี้ */
+        }
+        
         .badge-normal {
-            background-color: #0d6efd;
+            background-color: var(--warm-primary);
             color: white;
         }
 
         .badge-qw {
-            background-color: #ffc107;
-            color: black;
+            background-color: #f4a261;
+            color: white;
+        }
+
+        /* ตารางสไตล์โมเดิร์น (ไม่มีเส้นขอบ เว้นระยะแถว) */
+        .table-modern {
+            border-collapse: separate;
+            border-spacing: 0 10px;
+        }
+        .table-modern thead th {
+            border: none;
+            background-color: var(--warm-primary);
+            color: #ffffff;
+            font-weight: bold;
+            padding: 15px;
+        }
+        .table-modern tbody tr {
+            background-color: #ffffff;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            transition: all 0.3s ease;
+        }
+        .table-modern tbody tr:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+            background-color: #fbfbfb;
+        }
+        .table-modern tbody td {
+            border: none;
+            padding: 15px;
+            vertical-align: middle;
+        }
+        .table-modern tbody td:first-child, .table-modern thead th:first-child {
+            border-top-left-radius: 12px;
+            border-bottom-left-radius: 12px;
+        }
+        .table-modern tbody td:last-child, .table-modern thead th:last-child {
+            border-top-right-radius: 12px;
+            border-bottom-right-radius: 12px;
+        }
+
+        /* ปุ่มสีโทนร้อน */
+        .btn-warm {
+            background-color: var(--warm-primary);
+            color: white;
+            border: none;
+            transition: all 0.3s ease;
+        }
+        .btn-warm:hover {
+            background-color: var(--warm-hover);
+            color: white;
         }
 
         /* การปรับแต่งสำหรับ Mobile */
@@ -229,20 +289,22 @@ try {
     </style>
 </head>
 
-<body>
+<body class="bg-light d-flex flex-column min-vh-100">
+    <?php include 'navbar.php'; ?>
+
     <div class="container mt-3 mt-md-5">
         <div class="card shadow-lg p-4">
             <h2 class="card-title text-center mb-4">
-                <i class="fas fa-user-clock text-primary"></i> รายละเอียดประวัติการนิเทศ
+                <i class="fas fa-user-clock" style="color: var(--warm-primary);"></i> รายละเอียดประวัติการนิเทศ
             </h2>
 
             <?php if (!empty($academic_year)): ?>
-                <div class="alert alert-info text-center fw-bold mb-3 py-2">
+                <div class="alert text-center fw-bold mb-3 py-2" style="background-color: var(--warm-light); color: #b7472a; border: 1px solid #f4cbba;">
                     ปีการศึกษา <?= htmlspecialchars($academic_year) ?>
                 </div>
             <?php endif; ?>
 
-            <div class="card mb-4 border-primary">
+            <div class="card mb-4" style="border: 2px solid var(--warm-secondary);">
                 <div class="card-body bg-light p-3">
                     <div class="row g-2">
                         <div class="col-12 col-md-6">
@@ -255,20 +317,21 @@ try {
                             <strong>ตำแหน่ง:</strong> <?php echo htmlspecialchars($teacher_info['teacher_position']); ?>
                         </div>
                         <div class="col-12 col-md-6">
-                            <strong>กลุ่มสาระ:</strong> <?php echo htmlspecialchars($teacher_info['subjectgroup_name'] ?? '-'); ?>
+                            <strong>กลุ่มสาระการเรียนรู้:</strong> <?php echo htmlspecialchars($teacher_info['subjectgroup_name'] ?? '-'); ?>
                         </div>
                     </div>
                 </div>
             </div>
 
             <div class="table-responsive">
-                <table class="table table-bordered table-hover align-middle">
-                    <thead class="table-primary text-center">
+                <table class="table table-modern text-center w-100">
+                    <thead>
                         <tr>
                             <th>วันที่/เวลา</th>
+                            <th>ปีการศึกษา</th>
                             <th>ประเภท</th>
                             <th>หัวข้อ / วิชา</th>
-                            <th>ผู้นิเทศก์</th>
+                            <th>ผู้นิเทศ</th>
                             <th>จัดการ</th>
                         </tr>
                     </thead>
@@ -287,22 +350,26 @@ try {
                                         <small class="text-muted"><?php echo (new DateTime($row['supervision_date']))->format('H:i'); ?> น.</small>
                                     </td>
 
+                                    <td class="text-center fw-bold text-secondary">
+                                        <?php echo htmlspecialchars($row['academic_year'] ?? '-'); ?>
+                                    </td>
+
                                     <td class="text-center" style="min-width: 100px;">
                                         <?php if ($row['session_type'] === 'normal'): ?>
-                                            <span class="badge badge-normal">นิเทศห้เรียน</span>
+                                            <span class="badge badge-normal">นิเทศชั้นเรียน</span>
                                             <?php if ($row['time_info']): ?><br><small>ครั้งที่ <?php echo $row['time_info']; ?></small><?php endif; ?>
                                         <?php else: ?>
                                             <span class="badge badge-qw">Quick Win</span>
                                         <?php endif; ?>
                                     </td>
 
-                                    <td>
-                                        <div class="text-wrap" style="min-width: 120px;">
+                                    <td class="text-center">
+                                        <div class="text-wrap mx-auto" style="min-width: 120px;">
                                             <?php echo htmlspecialchars($row['topic'] ?? ''); ?>
                                         </div>
                                     </td>
 
-                                    <td>
+                                    <td class="text-center">
                                         <small><?php echo htmlspecialchars($row['supervisor_full_name']); ?></small>
                                     </td>
 
@@ -324,7 +391,7 @@ try {
                                                     <input type="hidden" name="p_id" value="<?php echo $row['qw_p_id']; ?>">
                                                     <input type="hidden" name="date" value="<?php echo $row['qw_date']; ?>">
                                                 <?php endif; ?>
-                                                <button type="submit" class="btn btn-sm btn-info text-white w-100">
+                                            <button type="submit" class="btn btn-sm btn-warm w-100">
                                                     <i class="fas fa-file-alt"></i> รายงาน
                                                 </button>
                                             </form>
@@ -338,9 +405,11 @@ try {
                                                             <input type="hidden" name="s_pid" value="<?php echo $row['supervisor_p_id']; ?>">
                                                             <input type="hidden" name="sub_code" value="<?php echo $row['subject_code']; ?>">
                                                             <input type="hidden" name="time" value="<?php echo $row['inspection_time']; ?>">
+                                                            <input type="hidden" name="academic_year" value="<?php echo $row['academic_year']; ?>">
                                                         <?php else: ?>
                                                             <input type="hidden" name="p_id" value="<?php echo $row['qw_p_id']; ?>">
                                                             <input type="hidden" name="date" value="<?php echo $row['qw_date']; ?>">
+                                                            <input type="hidden" name="academic_year" value="<?php echo $row['academic_year']; ?>">
                                                         <?php endif; ?>
                                                         <button type="submit" class="btn btn-sm btn-warning w-100">
                                                             <i class="fas fa-star"></i> ประเมิน
@@ -354,10 +423,12 @@ try {
                                                             <input type="hidden" name="t_pid" value="<?php echo $row['teacher_t_pid']; ?>">
                                                             <input type="hidden" name="sub_code" value="<?php echo $row['subject_code']; ?>">
                                                             <input type="hidden" name="time" value="<?php echo $row['inspection_time']; ?>">
+                                                            <input type="hidden" name="academic_year" value="<?php echo $row['academic_year']; ?>">
                                                         <?php else: ?>
                                                             <input type="hidden" name="t_id" value="<?php echo $row['qw_t_id']; ?>">
                                                             <input type="hidden" name="p_id" value="<?php echo $row['qw_p_id']; ?>">
                                                             <input type="hidden" name="date" value="<?php echo $row['qw_date']; ?>">
+                                                            <input type="hidden" name="academic_year" value="<?php echo $row['academic_year']; ?>">
                                                         <?php endif; ?>
                                                         <button type="submit" class="btn btn-sm btn-success w-100">
                                                             <i class="fas fa-certificate"></i> เกียรติบัตร
@@ -373,15 +444,10 @@ try {
                     </tbody>
                 </table>
             </div>
-
-            <div class="text-center mt-4">
-                <a href="index.php<?= !empty($academic_year) ? '?academic_year=' . urlencode($academic_year) : '' ?>"
-                    class="btn btn-secondary shadow-sm">
-                    <i class="fas fa-chevron-left"></i> กลับไปหน้าหลัก
-                </a>
-            </div>
         </div>
     </div>
+
+    <?php include 'footer.php'; ?>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>

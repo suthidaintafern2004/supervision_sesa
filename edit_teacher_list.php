@@ -25,7 +25,9 @@ try {
     <link rel="stylesheet" href="css/teacher.css">
 </head>
 
-<body>
+<body class="bg-light">
+
+    <?php include 'navbar.php'; ?>
 
     <div class="container-custom py-4">
         <div class="card card-custom p-4">
@@ -42,9 +44,6 @@ try {
                     <button class="btn btn-gradient" data-bs-toggle="modal" data-bs-target="#addTeacherModal">
                         <i class="fas fa-user-plus me-2"></i> เพิ่มข้อมูลครู
                     </button>
-                    <a href="index.php" class="btn btn-danger">
-                        <i class="fas fa-arrow-left me-1"></i> กลับหน้าหลัก
-                    </a>
                 </div>
             </div>
 

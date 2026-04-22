@@ -4,6 +4,8 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+date_default_timezone_set('Asia/Bangkok');
+
 // 1. เชื่อมต่อฐานข้อมูล (PDO)
 if (file_exists('../config/db_connect.php')) {
     require_once '../config/db_connect.php';
@@ -89,18 +91,28 @@ $semesters = [
 // 4. ดึงข้อมูลตัวเลือก (Options)
 $options = [];
 try {
-    $sql = "SELECT OptionID, OptionText FROM quickwin_options ORDER BY OptionID ASC";
+    // ตรวจสอบว่ามีคอลัมน์ display_order หรือไม่ (รองรับระบบเรียงลำดับใหม่)
+    $has_display_order = false;
+    try {
+        $conn->query("SELECT display_order FROM quickwin_options LIMIT 1");
+        $has_display_order = true;
+    } catch (Exception $e) {}
+
+    $order_clause = $has_display_order ? "ORDER BY display_order ASC, OptionID ASC" : "ORDER BY OptionID ASC";
+    $sql = "SELECT OptionID, OptionText FROM quickwin_options $order_clause";
     $stmt = $conn->prepare($sql);
     $stmt->execute();
     $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     $seenTexts = [];
+    $display_number = 1;
     foreach ($result as $row) {
         $key = trim($row['OptionText']);
         if (isset($seenTexts[$key])) {
             continue;
         }
         $seenTexts[$key] = true;
+        $row['display_number'] = $display_number++; // รันลำดับใหม่เสมอเพื่อป้องกันตัวเลขฟันหลอ
         $options[] = $row;
     }
 } catch (PDOException $e) {
@@ -125,9 +137,21 @@ $col2_options = array_slice($options, $half);
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     <link rel="stylesheet" href="../css/styles.css">
     <link rel="stylesheet" href="../css/quickwin_form.css">
+    <style>
+        .btn-modern {
+            transition: all 0.3s ease;
+        }
+        .btn-modern:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.15) !important;
+        }
+    </style>
 </head>
 
-<body>
+<body class="bg-light">
+
+    <?php $nav_prefix = '../'; include '../navbar.php'; ?>
+
     <div class="container my-5">
         <div class="row justify-content-center">
             <div class="col-lg-10 col-xl-10">
@@ -169,11 +193,11 @@ $col2_options = array_slice($options, $half);
                                     </div>
 
                                     <div class="col-md-3">
-                                        <small class="text-muted d-block">ภาคเรียน</small>
+                                        <small class="text-muted d-block">ภาคเรียน <span class="text-danger">*</span></small>
                                         <select name="semester" class="form-select mt-1" required>
+                                            <option value="" selected disabled>โปรดเลือกภาคเรียน</option>
                                             <?php foreach ($semesters as $key => $label): ?>
-                                                <option value="<?= $key ?>"
-                                                    <?= ($key == $currentSemester) ? 'selected' : '' ?>>
+                                                <option value="<?= $key ?>">
                                                     <?= $label ?>
                                                 </option>
                                             <?php endforeach; ?>
@@ -181,11 +205,11 @@ $col2_options = array_slice($options, $half);
                                     </div>
 
                                     <div class="col-md-3">
-                                        <small class="text-muted d-block">ปีการศึกษา</small>
+                                        <small class="text-muted d-block">ปีการศึกษา <span class="text-danger">*</span></small>
                                         <select name="academic_year" class="form-select mt-1" required>
+                                            <option value="" selected disabled>โปรดเลือกปีการศึกษา</option>
                                             <?php foreach ($academicYears as $year): ?>
-                                                <option value="<?= $year ?>"
-                                                    <?= ($year == $currentAcademicYear) ? 'selected' : '' ?>>
+                                                <option value="<?= $year ?>">
                                                     <?= $year ?>
                                                 </option>
                                             <?php endforeach; ?>
@@ -199,9 +223,10 @@ $col2_options = array_slice($options, $half);
                             <input type="hidden" name="teacher_t_pid" value="<?php echo htmlspecialchars($teacher_pid); ?>">
 
                             <div class="mb-4">
-                                <label class="form-label form-label-bold text-danger fs-5 mb-3">
+                                <label class="form-label form-label-bold text-danger fs-5 mb-1">
                                     <i class="fas fa-list-check"></i> เลือกหัวข้อจุดเน้น (Quick Win) ที่ต้องการนิเทศ
                                 </label>
+                                <div class="text-muted small mb-3">โปรดเลือกหัวข้อการนิเทศอย่างน้อย 1 หัวข้อ</div>
 
                                 <div class="row">
                                     <div class="col-md-6 border-end">
@@ -217,7 +242,7 @@ $col2_options = array_slice($options, $half);
                                                 <label
                                                     class="form-check-label option-text"
                                                     for="opt_<?= $opt['OptionID']; ?>">
-                                                    <?= htmlspecialchars($opt['OptionID'] . '. ' . $opt['OptionText']); ?>
+                                                    <?= htmlspecialchars($opt['display_number'] . '. ' . $opt['OptionText']); ?>
                                                 </label>
                                             </div>
                                         <?php endforeach; ?>
@@ -235,7 +260,7 @@ $col2_options = array_slice($options, $half);
                                                 <label
                                                     class="form-check-label option-text"
                                                     for="opt_<?= $opt['OptionID']; ?>">
-                                                    <?= htmlspecialchars($opt['OptionID'] . '. ' . $opt['OptionText']); ?>
+                                                    <?= htmlspecialchars($opt['display_number'] . '. ' . $opt['OptionText']); ?>
                                                 </label>
                                             </div>
                                         <?php endforeach; ?>
@@ -274,18 +299,16 @@ $col2_options = array_slice($options, $half);
 
                                 <div class="row mt-5">
                                     <div class="col-md-10 mx-auto">
-                                        <div class="d-flex justify-content-center gap-3">
+                                        <div class="d-flex justify-content-center gap-4">
 
-                                            <!-- ปุ่มบันทึก (สีเขียว) -->
                                             <button type="submit"
-                                                class="btn btn-success btn-lg px-5 shadow">
-                                                <i class="fas fa-save me-2"></i> บันทึกข้อมูล
+                                                class="btn btn-success btn-lg px-5 rounded-pill shadow-sm btn-modern">
+                                                Save
                                             </button>
 
-                                            <!-- ปุ่มย้อนกลับ (แดงแบบโปร่ง) -->
                                             <a href="../supervision_start.php?edit=true"
-                                                class="btn btn-danger btn-lg px-4">
-                                                <i class="fas fa-arrow-left me-2"></i> ยกเลิก
+                                                class="btn btn-outline-danger btn-lg px-5 rounded-pill shadow-sm btn-modern">
+                                                Cancel
                                             </a>
 
                                         </div>
@@ -323,49 +346,13 @@ $col2_options = array_slice($options, $half);
     </script>
 
     <script>
-        /* ===============================
-   ตรวจสอบก่อนบันทึก Quick Win
-=============================== */
-        function confirmQuickWinSave() {
-
-            const checkedCount = document.querySelectorAll('.qw-checkbox:checked').length;
-            const otherText = document.getElementById('option_other').value.trim();
-
-            // ยังไม่เลือกอะไรเลย
-            if (checkedCount === 0 && otherText === '') {
-                Swal.fire({
-                    icon: 'warning',
-                    title: '⚠️ ข้อมูลไม่ครบ',
-                    text: 'กรุณาเลือกหัวข้อ Quick Win อย่างน้อย 1 ข้อ หรือระบุหัวข้ออื่น ๆ',
-                    confirmButtonText: 'ตกลง'
-                });
-                return;
-            }
-
-            // ยืนยันการบันทึก
-            Swal.fire({
-                icon: 'question',
-                title: 'ยืนยันการบันทึก',
-                text: 'ต้องการบันทึกข้อมูล Quick Win ใช่หรือไม่?',
-                showCancelButton: true,
-                confirmButtonText: '💾 บันทึก',
-                cancelButtonText: 'ยกเลิก'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    document.getElementById('evaluationForm').submit(); // แก้จาก quickwinForm เป็น evaluationForm
-                }
-            });
-        }
-    </script>
-
-    <script>
-        document.getElementById('evaluationForm').addEventListener('submit', function(e) {
+        document.getElementById('evaluationForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
 
             const checkedCount = document.querySelectorAll('.qw-checkbox:checked').length;
             const otherText = document.getElementById('option_other').value.trim();
 
             if (checkedCount === 0 && otherText === '') {
-                e.preventDefault();
                 Swal.fire({
                     icon: 'warning',
                     title: 'แจ้งเตือน',
@@ -375,7 +362,47 @@ $col2_options = array_slice($options, $half);
                 return;
             }
 
-            e.preventDefault();
+            const semesterVal = document.querySelector('select[name="semester"]').value;
+            const academicYearVal = document.querySelector('select[name="academic_year"]').value;
+            const tPidVal = document.querySelector('input[name="teacher_t_pid"]').value;
+
+            if (!semesterVal || !academicYearVal) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'ข้อมูลไม่ครบ',
+                    text: 'กรุณาเลือกภาคเรียนและปีการศึกษา',
+                    confirmButtonText: 'ตกลง'
+                });
+                return;
+            }
+
+            // --- เริ่มตรวจสอบข้อมูลซ้ำแบบ Live Check ก่อนกดยืนยัน ---
+            try {
+                const dupFormData = new FormData();
+                dupFormData.append('form_type', 'quickwin');
+                dupFormData.append('t_pid', tPidVal);
+                dupFormData.append('academic_year', academicYearVal);
+
+                const dupResponse = await fetch('../check_duplicate.php', {
+                    method: 'POST',
+                    body: dupFormData
+                });
+                
+                const dupResult = await dupResponse.json();
+
+                if (dupResult.is_duplicate) {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'ข้อมูลซ้ำ',
+                        text: `ครูท่านนี้ได้รับการนิเทศจุดเน้นในปีการศึกษา ${academicYearVal} นี้แล้วไม่สามารถบันทึกซ้ำได้`,
+                        confirmButtonText: 'ตกลง'
+                    });
+                    return; // หยุดการทำงานทันที ข้อมูลฟอร์มยังคงอยู่
+                }
+            } catch (error) {
+                console.error('Check duplicate error:', error);
+            }
+            // --- สิ้นสุดการตรวจสอบ ---
 
             Swal.fire({
                 icon: 'question',
@@ -384,34 +411,35 @@ $col2_options = array_slice($options, $half);
                 showCancelButton: true,
                 confirmButtonText: 'บันทึก',
                 cancelButtonText: 'ยกเลิก'
-            }).then(result => {
+            }).then(async result => {
                 if (result.isConfirmed) {
-                    e.target.submit();
+                    Swal.fire({
+                        title: 'กำลังบันทึก...',
+                        allowOutsideClick: false,
+                        didOpen: () => {
+                            Swal.showLoading();
+                        }
+                    });
+                    
+                    const formData = new FormData(e.target);
+                    try {
+                        const response = await fetch('save_quickwin_data.php', { method: 'POST', body: formData });
+                        const resultData = await response.json();
+                        
+                        if (resultData.status === 'success') {
+                            Swal.fire({ icon: 'success', title: 'สำเร็จ', text: resultData.message, timer: 2000, showConfirmButton: false }).then(() => {
+                                window.location.href = '../index.php?success=save';
+                            });
+                        } else {
+                            Swal.fire({ icon: 'error', title: 'พบข้อผิดพลาด', text: resultData.message, confirmButtonText: 'ตกลง' });
+                        }
+                    } catch (error) {
+                        Swal.fire('ข้อผิดพลาด', 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้', 'error');
+                    }
                 }
             });
         });
     </script>
-
-    </script>
-
-    <?php if (!empty($_SESSION['flash_once'])): ?>
-        <script>
-            Swal.fire({
-                icon: <?= json_encode($_SESSION['flash_type'] ?? 'success') ?>,
-                title: 'สำเร็จ',
-                text: <?= json_encode($_SESSION['flash_message']) ?>,
-                confirmButtonText: 'รับทราบ'
-            });
-        </script>
-    <?php
-        // 🔥 ล้างทันทีหลังแสดง
-        unset(
-            $_SESSION['flash_once'],
-            $_SESSION['flash_message'],
-            $_SESSION['flash_type']
-        );
-    endif;
-    ?>
 
     <script>
         const input = document.getElementById('quickwin_images');
@@ -430,7 +458,7 @@ $col2_options = array_slice($options, $half);
                 }
 
                 if (selectedFiles.length >= 2) {
-                    alert('สามารถอัปโหลดได้ไม่เกิน 2 รูป');
+                    Swal.fire('จำกัดรูปภาพ', 'อัปโหลดได้ไม่เกิน 2 รูป', 'warning');
                     break;
                 }
 
@@ -456,16 +484,19 @@ $col2_options = array_slice($options, $half);
 
                     const img = document.createElement('img');
                     img.src = e.target.result;
-                    img.style.width = '150px';
-                    img.style.height = '150px';
+                    img.style.width = '160px';
+                    img.style.height = '160px';
                     img.style.objectFit = 'cover';
-                    img.className = 'rounded shadow';
+                    img.className = 'rounded shadow border';
 
                     // ปุ่มลบ
                     const removeBtn = document.createElement('button');
                     removeBtn.type = 'button';
-                    removeBtn.innerHTML = '✖';
-                    removeBtn.className = 'btn btn-danger btn-sm position-absolute top-0 end-0';
+                    removeBtn.innerHTML = '<i class="fas fa-trash"></i>';
+                    removeBtn.className = 'btn btn-danger btn-sm position-absolute top-0 end-0 m-1 rounded-circle d-flex justify-content-center align-items-center';
+                    removeBtn.style.width = '28px';
+                    removeBtn.style.height = '28px';
+                    removeBtn.style.padding = '0';
 
                     removeBtn.onclick = function() {
                         selectedFiles.splice(index, 1);

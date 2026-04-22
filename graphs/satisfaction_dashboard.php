@@ -18,8 +18,11 @@ $form_type = isset($_GET['form_type']) ? $_GET['form_type'] : '1';
 // --- ส่วนที่ปรับปรุงใหม่ ---
 $current_year_th = (int)date("Y") + 543;
 
-// 1. ดึงรายการปีการศึกษาทั้งหมดที่มีในฐานข้อมูล
-$years_sql = "SELECT academic_year FROM supervision_sessions UNION SELECT academic_year FROM quick_win ORDER BY academic_year DESC";
+// 1. ดึงรายการปีการศึกษาทั้งหมดที่มีในฐานข้อมูล (เฉพาะที่มีค่าจริง)
+$years_sql = "SELECT academic_year FROM supervision_sessions WHERE academic_year IS NOT NULL AND academic_year != '' 
+              UNION 
+              SELECT academic_year FROM quick_win WHERE academic_year IS NOT NULL AND academic_year != '' 
+              ORDER BY academic_year DESC";
 $available_years = $conn->query($years_sql)->fetchAll(PDO::FETCH_COLUMN);
 
 // 2. หาปีล่าสุดที่มีข้อมูลในฐานข้อมูล (ถ้าไม่มีเลย ให้ใช้ปีปัจจุบัน)
@@ -30,13 +33,15 @@ $latest_data_year = !empty($available_years) ? (int)$available_years[0] : $curre
 // - ถ้าเปิดหน้าเว็บมาครั้งแรก ให้ใช้ $latest_data_year (ปีล่าสุดที่มีข้อมูล)
 $selected_year = isset($_GET['academic_year']) ? (int)$_GET['academic_year'] : $latest_data_year;
 
-// สีพาสเทลแบบเข้ม
-$vividPastelColors = ['#FF9AA2', '#FFB7B2', '#FFDAC1', '#E2F0CB', '#B5EAD7', '#C7CEEA', '#F3B0C3', '#97C1A9', '#8FCACA', '#CCA9DD'];
+// โทนสีเข้มขรึม สบายตา ไม่ฉูดฉาดจนเกินไป (Muted/Jewel Tones)
+$vividPastelColors = ['#6096BA', '#E07A5F', '#3D405B', '#81B29A', '#F2CC8F', '#6096BA', '#1D3557', '#E63946', '#2A9D8F', '#F4A261'];
 
 try {
     if ($form_type === 'personal') {
         // ========================= โหมดสถิติรายบุคคล (ศน.) =========================
         $page_title = "สถิติการนิเทศรายบุคคล (ศน.)";
+        $page_title_main = "สถิติการนิเทศรายบุคคล (ศน.)";
+        $page_title_sub = "";
 
         $stmt = $conn->prepare("
             SELECT CONCAT(pre.prefix_name, s.fname, ' ', s.lname) AS fullname 
@@ -56,31 +61,45 @@ try {
         $count_qw = $qw_stmt->fetchColumn();
 
         $summaryStmt = $conn->prepare("
-            SELECT COUNT(DISTINCT ss.t_pid) AS teachers, COUNT(DISTINCT t.school_id) AS schools, COUNT(DISTINCT t.subjectgroup_id) AS subjects 
-            FROM supervision_sessions ss JOIN teacher t ON ss.t_pid = t.t_pid 
-            WHERE ss.p_id = :pid AND ss.academic_year = :year
+            SELECT COUNT(DISTINCT all_ss.t_pid) AS teachers, COUNT(DISTINCT t.school_id) AS schools, COUNT(DISTINCT t.subjectgroup_id) AS subjects 
+            FROM (
+                SELECT t_pid, p_id, academic_year FROM supervision_sessions
+                UNION ALL
+                SELECT t_pid, p_id, academic_year FROM quick_win
+            ) all_ss JOIN teacher t ON all_ss.t_pid = t.t_pid 
+            WHERE all_ss.p_id = :pid AND all_ss.academic_year = :year
         ");
         $summaryStmt->execute(['pid' => $supervisor_p_id, 'year' => $selected_year]);
         $personal_summary = $summaryStmt->fetch(PDO::FETCH_ASSOC);
 
         $stmt_sch = $conn->prepare("
-            SELECT sc.school_name, COUNT(*) AS count FROM supervision_sessions ss 
-            JOIN teacher t ON ss.t_pid = t.t_pid JOIN school sc ON t.school_id = sc.school_id 
-            WHERE ss.p_id = :pid AND ss.academic_year = :year GROUP BY sc.school_name ORDER BY count DESC
+            SELECT sc.school_name, COUNT(*) AS count FROM (
+                SELECT t_pid, p_id, academic_year FROM supervision_sessions
+                UNION ALL
+                SELECT t_pid, p_id, academic_year FROM quick_win
+            ) all_ss 
+            JOIN teacher t ON all_ss.t_pid = t.t_pid JOIN school sc ON t.school_id = sc.school_id 
+            WHERE all_ss.p_id = :pid AND all_ss.academic_year = :year GROUP BY sc.school_name ORDER BY count DESC
         ");
         $stmt_sch->execute(['pid' => $supervisor_p_id, 'year' => $selected_year]);
         $data_school = $stmt_sch->fetchAll(PDO::FETCH_ASSOC);
 
         $stmt_lg = $conn->prepare("
-            SELECT sg.subjectgroup_name AS label, COUNT(*) AS value FROM supervision_sessions ss 
-            JOIN teacher t ON ss.t_pid = t.t_pid JOIN subject_group sg ON t.subjectgroup_id = sg.subjectgroup_id 
-            WHERE ss.p_id = :pid AND ss.academic_year = :year GROUP BY sg.subjectgroup_name ORDER BY value DESC
+            SELECT sg.subjectgroup_name AS label, COUNT(*) AS value FROM (
+                SELECT t_pid, p_id, academic_year FROM supervision_sessions
+                UNION ALL
+                SELECT t_pid, p_id, academic_year FROM quick_win
+            ) all_ss 
+            JOIN teacher t ON all_ss.t_pid = t.t_pid JOIN subject_group sg ON t.subjectgroup_id = sg.subjectgroup_id 
+            WHERE all_ss.p_id = :pid AND all_ss.academic_year = :year GROUP BY sg.subjectgroup_name ORDER BY value DESC
         ");
         $stmt_lg->execute(['pid' => $supervisor_p_id, 'year' => $selected_year]);
         $data_lg = $stmt_lg->fetchAll(PDO::FETCH_ASSOC);
     } else {
         // ========================= โหมดภาพรวมปกติ (Classroom / Quick Win) =========================
-        $page_title = ($form_type == '3') ? "สถิติรายงานการประเมินการนิเทศจุดเน้น ( Quick Win )" : "สถิติรายงานการประเมินการนิเทศชั้นเรียน ( Classroom)";
+        $page_title = ($form_type == '3') ? "สถิติรายงานการประเมินการนิเทศจุดเน้น (Quick Win)" : "สถิติรายงานการประเมินการนิเทศชั้นเรียน (Classroom)";
+        $page_title_main = ($form_type == '3') ? "สถิติรายงานการประเมินการนิเทศจุดเน้น" : "สถิติรายงานการประเมินการนิเทศชั้นเรียน";
+        $page_title_sub = ($form_type == '3') ? "Quick Win" : "Classroom";
         $ans_table = ($form_type == '3') ? "quickwin_satisfaction_answers" : "satisfaction_answers";
 
         $stmt_sat = $conn->prepare("
@@ -134,11 +153,11 @@ try {
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
-            --p-blue: #A2D2FF;
-            --p-pink: #FFB3BA;
-            --p-green: #B9FBC0;
-            --p-purple: #DDBAFF;
-            --p-orange: #FFDAC1;
+            --p-blue: #6096BA;
+            --p-pink: #E07A5F;
+            --p-green: #2A9D8F;
+            --p-purple: #3D405B;
+            --p-orange: #F4A261;
         }
 
         body {
@@ -172,17 +191,18 @@ try {
             padding: 12px;
             font-weight: bold;
             text-align: center;
-            color: #333;
+            color: #ffffff;
         }
 
         .nav-pills .nav-link.active {
             background-color: var(--p-blue);
-            color: #000;
+            color: #ffffff;
             font-weight: bold;
         }
 
         .nav-pills .nav-link.active.personal {
             background-color: var(--p-purple);
+            color: #ffffff;
         }
 
         .btn-home {
@@ -207,7 +227,10 @@ try {
         <div class="filter-section shadow-sm">
             <div class="row align-items-center">
                 <div class="col-md-5">
-                    <h4 class="mb-0 text-dark fw-bold"><i class="fas fa-chart-line text-primary me-2"></i> <?= $page_title ?></h4>
+                    <h4 class="mb-0 text-dark fw-bold"><i class="fas fa-chart-line text-primary me-2"></i> <?= $page_title_main ?></h4>
+                    <?php if (!empty($page_title_sub)): ?>
+                        <div class="text-secondary fw-bold fs-5 mt-1" style="margin-left: 2.2rem;"><?= $page_title_sub ?></div>
+                    <?php endif; ?>
                     <?php if ($form_type === 'personal'): ?>
                         <span class="badge rounded-pill bg-info text-dark mt-2 px-3 fw-bold">ศึกษานิเทศก์: <?= htmlspecialchars($supervisor_info['fullname'] ?? '-') ?></span>
                     <?php endif; ?>
@@ -217,12 +240,13 @@ try {
                     <form action="" method="GET" class="d-flex gap-2">
                         <input type="hidden" name="form_type" value="<?= $form_type ?>">
                         <select name="academic_year" class="form-select rounded-pill border-0 bg-light fw-bold shadow-sm" onchange="this.form.submit()">
-                            <?php if (!in_array($current_year_th, $available_years)): ?>
-                                <option value="<?= $current_year_th ?>" <?= $selected_year == $current_year_th ? 'selected' : '' ?>>ปีการศึกษา <?= $current_year_th ?></option>
+                            <?php if (empty($available_years)): ?>
+                                <option value="">ไม่มีข้อมูลปีการศึกษา</option>
+                            <?php else: ?>
+                                <?php foreach ($available_years as $y): ?>
+                                    <option value="<?= $y ?>" <?= $y == $selected_year ? 'selected' : '' ?>>ปีการศึกษา <?= $y ?></option>
+                                <?php endforeach; ?>
                             <?php endif; ?>
-                            <?php foreach ($available_years as $y): ?>
-                                <option value="<?= $y ?>" <?= $y == $selected_year ? 'selected' : '' ?>>ปีการศึกษา <?= $y ?></option>
-                            <?php endforeach; ?>
                         </select>
                     </form>
                     <div class="nav nav-pills bg-light rounded-pill p-1 shadow-sm">
@@ -316,7 +340,7 @@ try {
                 <div class="col-12 mb-4">
                     <div class="stat-card">
                         <div class="card-title-bar" style="background-color: var(--p-green);">สถิติจำนวนครั้งการนิเทศรายโรงเรียน</div>
-                        <div class="card-body" style="height: 550px;"><canvas id="schoolChart"></canvas></div>
+                        <div class="card-body" style="height: 450px;"><canvas id="schoolChart"></canvas></div>
                     </div>
                 </div>
                 <div class="col-lg-7 mb-4">
@@ -349,7 +373,7 @@ try {
                     labels: ['Classroom', 'Quick Win'],
                     datasets: [{
                         data: [<?= (int)$count_cr ?>, <?= (int)$count_qw ?>],
-                        backgroundColor: ['#A2D2FF', '#FFB3BA']
+                        backgroundColor: ['#6096BA', '#E07A5F']
                     }]
                 },
                 options: commonOptions
@@ -362,8 +386,8 @@ try {
                     datasets: [{
                         label: 'คะแนนเฉลี่ย',
                         data: <?= json_encode(array_column($data_main, 'avg_rating')) ?>,
-                        backgroundColor: 'rgba(162, 210, 255, 0.5)',
-                        borderColor: '#007bff',
+                        backgroundColor: 'rgba(96, 150, 186, 0.4)',
+                        borderColor: '#6096BA',
                         borderWidth: 2
                     }]
                 },
@@ -391,22 +415,41 @@ try {
         <?php endif; ?>
 
         new Chart(document.getElementById('schoolChart'), {
-            type: 'bar',
+            type: 'line',
             data: {
                 labels: <?= json_encode(array_column($data_school, 'school_name')) ?>,
                 datasets: [{
                     label: 'จำนวนครั้ง',
                     data: <?= json_encode(array_column($data_school, 'count')) ?>,
-                    backgroundColor: colors,
-                    borderRadius: 10
+                    backgroundColor: 'rgba(42, 157, 143, 0.4)', // สีเขียวโปร่งแสง
+                    borderColor: '#2A9D8F', // สีเขียวเข้ม
+                    borderWidth: 2,
+                    fill: true, // ทำให้เป็นกราฟพื้นที่ (รูปคลื่น)
+                    tension: 0.4, // ปรับความโค้งของเส้น
+                    pointBackgroundColor: '#E07A5F', // สีของจุด
+                    pointBorderColor: '#fff',
+                    pointRadius: 4,
+                    pointHoverRadius: 6
                 }]
             },
             options: {
                 ...commonOptions,
-                indexAxis: 'y',
                 plugins: {
                     legend: {
                         display: false
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: {
+                            maxRotation: 45,
+                            minRotation: 45,
+                            font: { size: 11 }
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: { stepSize: 1 }
                     }
                 }
             }

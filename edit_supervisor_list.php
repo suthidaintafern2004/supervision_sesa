@@ -51,7 +51,9 @@ try {
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 
-<body>
+<body class="bg-light">
+
+    <?php include 'navbar.php'; ?>
 
     <div class="container py-4">
         <div class="card shadow-sm supervisor-card">
@@ -281,9 +283,6 @@ try {
             </div>
         </div>
     </div>
-
-
-    <?php include 'footer.php'; ?>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 

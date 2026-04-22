@@ -28,6 +28,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $selected_form = $_POST['form_type'] ?? null;
     $t_pid         = trim($_POST['t_pid'] ?? '');
     $teacher_name  = trim($_POST['teacher_name'] ?? '');
+    $academic_year = $_POST['academic_year'] ?? null; // รับค่าปีการศึกษาจากฟอร์ม
 
     if (!$selected_form || !$t_pid) {
         $error_message = 'ข้อมูลไม่ครบถ้วน กรุณาเลือกผู้รับนิเทศและแบบฟอร์ม';
@@ -80,7 +81,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     'subject_name'    => $teacherInfo['subjectgroup_name'],
                     'supervisor_pid'  => $supervisor_pid,
                     'supervisor_name' => $supervisor_name,
-                    'form_type'       => $selected_form
+                    'form_type'       => $selected_form,
+                    'academic_year'   => $academic_year // ส่งต่อไปยังหน้าถัดไปผ่าน Session
                 ];
 
                 /* =========================================
@@ -90,31 +92,13 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     case 'quickwin_form':
 
                         /* =========================
-                        ฟังก์ชันคำนวณปีการศึกษา
-                        ========================= */
-                        function getAcademicYear($date)
-                        {
-                            $year  = (int)date('Y', strtotime($date));
-                            $month = (int)date('m', strtotime($date));
-                            return ($month < 5) ? $year - 1 : $year;
-                        }
-
-                        $academic_year = getAcademicYear(date('Y-m-d'));
-
-                        /* =========================
-                        ตรวจ Quick Win ซ้ำ
+                        ตรวจ Quick Win ซ้ำ (ใช้ปีการศึกษาที่เลือกมา)
                         ========================= */
                         $sql = "
                                 SELECT 1
                                 FROM quick_win
                                 WHERE t_pid = :t_pid
-                                AND (
-                                        CASE
-                                            WHEN MONTH(supervision_date) < 5
-                                            THEN YEAR(supervision_date) - 1
-                                            ELSE YEAR(supervision_date)
-                                        END
-                                    ) = :year
+                                AND academic_year = :year
                                 LIMIT 1
                             ";
 
@@ -175,11 +159,14 @@ if (
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="css/styles.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 
 <body class="bg-light">
+
+    <?php include 'navbar.php'; ?>
 
     <?php if ($flash_error): ?>
         <script>
@@ -197,7 +184,7 @@ if (
             <div class="card-header bg-primary text-white text-center py-3">
                 <h4 class="mb-0">
                     <i class="fas fa-clipboard-check me-2"></i>
-                    แบบบันทึกการนิเทศการสอน (KPI)
+                    แบบบันทึกการนิเทศการสอน (classroom)
                 </h4>
             </div>
 
@@ -217,8 +204,8 @@ if (
         </div>
     </div>
 
-
-
+    <!-- Bootstrap JS สำหรับเปิด-ปิดเมนู Offcanvas -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 
 </html>
