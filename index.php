@@ -145,6 +145,40 @@ try {
     <link rel="stylesheet" href="css/index.css">
     <link rel="stylesheet" href="css/table_teacher.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        /* จัดรูปแบบตารางสำหรับหน้าจอมือถือ (Responsive Table Card) */
+        @media (max-width: 767.98px) {
+            .teacher-table thead {
+                display: none; /* ซ่อนหัวตารางบนมือถือ */
+            }
+            .teacher-table tbody tr {
+                display: block;
+                margin-bottom: 1rem;
+                background-color: #fff;
+                border: 1px solid #dee2e6;
+                border-radius: 0.5rem;
+                box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.075);
+            }
+            .teacher-table tbody td {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 0.75rem 1rem;
+                border-bottom: 1px solid #dee2e6;
+                text-align: right !important;
+            }
+            .teacher-table tbody td:last-child {
+                border-bottom: 0;
+            }
+            .teacher-table tbody td::before {
+                content: attr(data-label); /* นำข้อความจาก data-label มาแสดงเป็นหัวข้อ */
+                font-weight: bold;
+                color: #495057;
+                text-align: left;
+                margin-right: 1rem;
+            }
+        }
+    </style>
 </head>
 
 <body class="bg-light">
@@ -192,9 +226,9 @@ try {
                 <table class="table table-hover align-middle teacher-table">
                     <thead class="table-light">
                         <tr>
-                            <th>ชื่อผู้รับนิเทศ</th>
-                            <th>โรงเรียน</th>
-                            <th>ตำแหน่ง</th>
+                            <th class="text-center" style="min-width: 150px;">ชื่อผู้รับนิเทศ</th>
+                            <th class="text-center" style="min-width: 150px;">โรงเรียน</th>
+                            <th class="text-center" style="min-width: 120px;">ตำแหน่ง</th>
                             <th class="text-center">จำนวนครั้ง</th>
                             <th class="text-center">ดูข้อมูล</th>
                         </tr>
@@ -207,15 +241,15 @@ try {
                         <?php else: ?>
                             <?php foreach ($results as $row): ?>
                                 <tr>
-                                    <td class="text-center"><strong><?= htmlspecialchars($row['teacher_full_name']) ?></strong></td>
-                                    <td class="text-center"><?= htmlspecialchars($row['t_school']) ?></td>
-                                    <td class="text-center"><?= htmlspecialchars($row['teacher_position']) ?></td>
-                                    <td class="text-center">
+                                    <td class="text-center" data-label="ชื่อผู้รับนิเทศ"><strong><?= htmlspecialchars($row['teacher_full_name']) ?></strong></td>
+                                    <td class="text-center" data-label="โรงเรียน"><?= htmlspecialchars($row['t_school']) ?></td>
+                                    <td class="text-center" data-label="ตำแหน่ง"><?= htmlspecialchars($row['teacher_position']) ?></td>
+                                    <td class="text-center" data-label="จำนวนครั้ง">
                                         <span class="badge rounded-pill bg-warning text-dark px-3">
                                             <?= $row['count_normal'] + $row['count_quickwin'] ?>
                                         </span>
                                     </td>
-                                    <td class="text-center">
+                                    <td class="text-center" data-label="ดูข้อมูล">
                                         <form action="session_details.php" method="POST">
                                             <input type="hidden" name="teacher_pid" value="<?= $row['teacher_t_pid'] ?>">
                                             <input type="hidden" name="academic_year" value="<?= htmlspecialchars($selected_year) ?>">

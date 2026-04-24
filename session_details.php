@@ -258,32 +258,57 @@ try {
                 font-size: 1.25rem;
             }
 
-            /* ปรับขนาดตัวอักษรในตาราง */
-            .table {
-                font-size: 0.85rem;
+            /* แปลงตารางเป็นแบบ Card บนหน้าจอมือถือ */
+            .table-modern thead {
+                display: none;
             }
-
-            .table th,
-            .table td {
-                padding: 8px 4px !important;
+            .table-modern tbody tr {
+                display: block;
+                margin-bottom: 15px;
+                border: 1px solid #eee;
+                border-radius: 12px;
+                box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
             }
-
-            /* ปรับปุ่มให้เล็กลงพอดีกับจอ */
-            .btn-group .btn {
-                padding: .25rem .4rem;
-                font-size: .75rem;
-                margin-bottom: 2px;
+            .table-modern tbody td {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                text-align: right !important;
+                padding: 12px 15px !important;
+                border-bottom: 1px solid #f9f9f9;
             }
-
+            .table-modern tbody td::before {
+                content: attr(data-label);
+                font-weight: bold;
+                color: var(--warm-primary);
+                text-align: left;
+                margin-right: 15px;
+            }
+            .table-modern tbody td:last-child {
+                border-bottom: none;
+                flex-direction: column;
+            }
+            .table-modern tbody td:last-child::before {
+                margin-bottom: 10px;
+                margin-right: 0;
+                text-align: center;
+            }
             .btn-group {
                 display: flex;
                 flex-direction: column;
-                /* เรียงปุ่มแนวตั้งบนมือถือเพื่อประหยัดความกว้าง */
+                width: 100%;
+                gap: 5px;
             }
 
             .btn-group form {
                 display: block;
                 width: 100%;
+            }
+
+            .btn-group .btn {
+                width: 100%;
+                padding: 8px;
+                font-size: 0.85rem;
             }
         }
     </style>
@@ -345,16 +370,16 @@ try {
                         <?php else : ?>
                             <?php foreach ($results as $row) : ?>
                                 <tr>
-                                    <td class="text-center" style="min-width: 90px;">
+                                    <td class="text-center" data-label="วันที่/เวลา" style="min-width: 90px;">
                                         <?php echo (new DateTime($row['supervision_date']))->format('d/m/y'); ?><br>
                                         <small class="text-muted"><?php echo (new DateTime($row['supervision_date']))->format('H:i'); ?> น.</small>
                                     </td>
 
-                                    <td class="text-center fw-bold text-secondary">
+                                    <td class="text-center fw-bold text-secondary" data-label="ปีการศึกษา">
                                         <?php echo htmlspecialchars($row['academic_year'] ?? '-'); ?>
                                     </td>
 
-                                    <td class="text-center" style="min-width: 100px;">
+                                    <td class="text-center" data-label="ประเภท" style="min-width: 100px;">
                                         <?php if ($row['session_type'] === 'normal'): ?>
                                             <span class="badge badge-normal">นิเทศชั้นเรียน</span>
                                             <?php if ($row['time_info']): ?><br><small>ครั้งที่ <?php echo $row['time_info']; ?></small><?php endif; ?>
@@ -363,17 +388,17 @@ try {
                                         <?php endif; ?>
                                     </td>
 
-                                    <td class="text-center">
+                                    <td class="text-center" data-label="หัวข้อ / วิชา">
                                         <div class="text-wrap mx-auto" style="min-width: 120px;">
                                             <?php echo htmlspecialchars($row['topic'] ?? ''); ?>
                                         </div>
                                     </td>
 
-                                    <td class="text-center">
+                                    <td class="text-center" data-label="ผู้นิเทศ">
                                         <small><?php echo htmlspecialchars($row['supervisor_full_name']); ?></small>
                                     </td>
 
-                                    <td class="text-center" style="min-width: 110px;">
+                                    <td class="text-center" data-label="จัดการ" style="min-width: 110px;">
                                         <div class="btn-group" role="group">
                                             <?php
                                             $report_action = ($row['session_type'] === 'normal') ? 'supervision_report.php' : 'quickwin_report.php';
