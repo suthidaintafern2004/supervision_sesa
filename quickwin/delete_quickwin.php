@@ -13,6 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $t_pid  = $_POST['t_pid'] ?? null;
 $p_id   = $_POST['p_id'] ?? null;
 $date   = $_POST['supervision_date'] ?? null;
+$academic_year = $_POST['academic_year'] ?? null;
 
 if (!$t_pid || !$p_id || !$date) {
     http_response_code(400);
@@ -20,16 +21,16 @@ if (!$t_pid || !$p_id || !$date) {
     exit;
 }
 
-$stmt = $conn->prepare("
-    UPDATE quick_win
-    SET deleted_at = NOW()
-    WHERE t_pid = ?
-      AND p_id = ?
-      AND supervision_date = ?
-      AND deleted_at IS NULL
-");
+$sql = "UPDATE quick_win SET deleted_at = NOW() WHERE t_pid = ? AND p_id = ? AND supervision_date = ? AND deleted_at IS NULL";
+$params = [$t_pid, $p_id, $date];
 
-$stmt->execute([$t_pid, $p_id, $date]);
+if ($academic_year) {
+    $sql .= " AND academic_year = ?";
+    $params[] = $academic_year;
+}
+
+$stmt = $conn->prepare($sql);
+$stmt->execute($params);
 
 if ($stmt->rowCount() === 0) {
     echo json_encode([
@@ -38,6 +39,15 @@ if ($stmt->rowCount() === 0) {
     ]);
     exit;
 }
+
+// ลบข้อมูลความพึงพอใจที่เกี่ยวข้อง
+$delSatSql = "DELETE FROM quickwin_satisfaction_answers WHERE p_id = ? AND t_pid = ?";
+$delSatParams = [$p_id, $t_pid];
+if ($academic_year) {
+    $delSatSql .= " AND academic_year = ?";
+    $delSatParams[] = $academic_year;
+}
+$conn->prepare($delSatSql)->execute($delSatParams);
 
 echo json_encode(['status' => 'success']);
 exit;

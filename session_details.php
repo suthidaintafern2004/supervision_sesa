@@ -11,6 +11,53 @@ date_default_timezone_set('Asia/Bangkok');
 
 require_once __DIR__ . '/config/db_connect.php';
 
+/* =========================================================
+   AUTO-FIX DATABASE SCHEMA สำหรับแบบประเมินความพึงพอใจ
+========================================================= */
+try {
+    // ปิดการตรวจสอบ Foreign Key ชั่วคราว ป้องกัน Error ระหว่างแก้ Primary Key
+    $conn->exec("SET FOREIGN_KEY_CHECKS=0;");
+
+    // 1. อัปเดตตาราง satisfaction_answers (สำหรับ Classroom)
+    $stmt = $conn->query("SHOW KEYS FROM satisfaction_answers WHERE Key_name = 'PRIMARY'");
+    $pk_cols = [];
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) { $pk_cols[] = $row['Column_name']; }
+    if (!empty($pk_cols) && !in_array('academic_year', $pk_cols)) {
+        $conn->exec("ALTER TABLE satisfaction_answers DROP PRIMARY KEY, ADD PRIMARY KEY(t_pid, subject_code, inspection_time, academic_year, question_id)");
+    }
+    
+    // ลบ Unique Key เก่าที่อาจจะกันการบันทึกข้อมูล (สำหรับ Classroom)
+    $stmt = $conn->query("SHOW INDEX FROM satisfaction_answers WHERE Non_unique = 0 AND Key_name != 'PRIMARY'");
+    $indexes = [];
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) { $indexes[$row['Key_name']][] = $row['Column_name']; }
+    foreach ($indexes as $key_name => $columns) {
+        if (!in_array('academic_year', $columns)) {
+            $conn->exec("ALTER TABLE satisfaction_answers DROP INDEX `$key_name`");
+        }
+    }
+
+    // 2. อัปเดตตาราง quickwin_satisfaction_answers (สำหรับ Quick Win)
+    $stmt = $conn->query("SHOW KEYS FROM quickwin_satisfaction_answers WHERE Key_name = 'PRIMARY'");
+    $pk_cols = [];
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) { $pk_cols[] = $row['Column_name']; }
+    if (!empty($pk_cols) && !in_array('academic_year', $pk_cols)) {
+        $conn->exec("ALTER TABLE quickwin_satisfaction_answers DROP PRIMARY KEY, ADD PRIMARY KEY(t_pid, academic_year, question_id)");
+    }
+    
+    // ลบ Unique Key เก่าที่อาจจะกันการบันทึกข้อมูล (สำหรับ Quick Win)
+    $stmt = $conn->query("SHOW INDEX FROM quickwin_satisfaction_answers WHERE Non_unique = 0 AND Key_name != 'PRIMARY'");
+    $indexes = [];
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) { $indexes[$row['Key_name']][] = $row['Column_name']; }
+    foreach ($indexes as $key_name => $columns) {
+        if (!in_array('academic_year', $columns)) {
+            $conn->exec("ALTER TABLE quickwin_satisfaction_answers DROP INDEX `$key_name`");
+        }
+    }
+
+    // เปิดการตรวจสอบ Foreign Key กลับมาเหมือนเดิม
+    $conn->exec("SET FOREIGN_KEY_CHECKS=1;");
+} catch (Exception $e) {}
+
 /* ===============================
    ตรวจสิทธิ์
 =============================== */
@@ -311,6 +358,15 @@ try {
                 font-size: 0.85rem;
             }
         }
+        
+        /* ดาวประเมินความพึงพอใจเว็บ */
+        .cursor-pointer {
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .cursor-pointer:hover {
+            transform: scale(1.2);
+        }
     </style>
 </head>
 
@@ -477,6 +533,139 @@ try {
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
+    <!-- Web Satisfaction Modal -->
+    <div class="modal fade" id="webSatisfactionModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content border-0 shadow-lg rounded-4">
+                <div class="modal-header border-0 pb-0 text-center justify-content-center">
+                    <h5 class="modal-title fw-bold" style="color: var(--warm-primary);">ประเมินการใช้งานระบบ</h5>
+                </div>
+                <div class="modal-body text-center pt-2">
+                    <p class="text-muted small mb-3">คุณรู้สึกอย่างไรกับการใช้งานระบบสารสนเทศนี้?</p>
+                    <div class="rating-stars mb-3">
+                        <i class="far fa-star fs-2 text-warning cursor-pointer" data-rating="1"></i>
+                        <i class="far fa-star fs-2 text-warning cursor-pointer" data-rating="2"></i>
+                        <i class="far fa-star fs-2 text-warning cursor-pointer" data-rating="3"></i>
+                        <i class="far fa-star fs-2 text-warning cursor-pointer" data-rating="4"></i>
+                        <i class="far fa-star fs-2 text-warning cursor-pointer" data-rating="5"></i>
+                    </div>
+                    <input type="hidden" id="webRatingValue" value="0">
+                    <div class="d-grid gap-2">
+                        <button type="button" class="btn btn-warm rounded-pill fw-bold disabled" id="btnSubmitWebRating">ส่งผลประเมิน</button>
+                        <button type="button" class="btn btn-light rounded-pill text-muted" onclick="postponeWebRating()">ไว้ภายหลัง</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showWebSatisfactionModal() {
+            // ตรวจสอบ LocalStorage และ Cookie (Dual-Layer Client Side)
+            const hasEvaluatedLS = localStorage.getItem('web_evaluated');
+            const hasEvaluatedCookie = document.cookie.split('; ').find(row => row.startsWith('web_evaluated='));
+            
+            const postponeUntilStr = localStorage.getItem('web_postpone_until');
+            let isPostponed = false;
+            if (postponeUntilStr) {
+                if (Date.now() < parseInt(postponeUntilStr)) {
+                    isPostponed = true; // ยังอยู่ในช่วงหน่วงเวลา 3 วัน
+                } else {
+                    localStorage.removeItem('web_postpone_until');
+                }
+            }
+
+            // ถ้ายังไม่เคยประเมิน และไม่ได้ถูกหน่วงเวลาไว้ ให้แสดง Modal
+            if (!hasEvaluatedLS && !hasEvaluatedCookie && !isPostponed) {
+                const webModal = new bootstrap.Modal(document.getElementById('webSatisfactionModal'));
+                webModal.show();
+            }
+        }
+
+        function postponeWebRating() {
+            // เลื่อนไปอีก 3 วันค่อยถามใหม่ (3 * 24 * 60 * 60 * 1000 ms)
+            const delay = Date.now() + (3 * 24 * 60 * 60 * 1000);
+            localStorage.setItem('web_postpone_until', delay.toString());
+            bootstrap.Modal.getInstance(document.getElementById('webSatisfactionModal')).hide();
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const stars = document.querySelectorAll('.rating-stars i');
+            const ratingInput = document.getElementById('webRatingValue');
+            const btnSubmit = document.getElementById('btnSubmitWebRating');
+
+            stars.forEach(star => {
+                star.addEventListener('click', function() {
+                    const rating = this.getAttribute('data-rating');
+                    ratingInput.value = rating;
+                    
+                    stars.forEach(s => {
+                        if (s.getAttribute('data-rating') <= rating) {
+                            s.classList.remove('far');
+                            s.classList.add('fas');
+                        } else {
+                            s.classList.remove('fas');
+                            s.classList.add('far');
+                        }
+                    });
+                    btnSubmit.classList.remove('disabled');
+                });
+            });
+
+            btnSubmit.addEventListener('click', function() {
+                const rating = ratingInput.value;
+                if (rating > 0) {
+                    const formData = new FormData();
+                    formData.append('rating', rating);
+
+                    // เปลี่ยนปุ่มเป็นสถานะกำลังโหลด
+                    const originalText = btnSubmit.innerHTML;
+                    btnSubmit.innerHTML = '<i class="fas fa-spinner fa-spin"></i> กำลังส่ง...';
+                    btnSubmit.classList.add('disabled');
+
+                    fetch('api/save_web_satisfaction.php', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(res => res.text()) // รับเป็น Text ก่อนเพื่อดัก Error จาก PHP
+                    .then(text => {
+                        try {
+                            const data = JSON.parse(text);
+                            if (data.success) {
+                                // บันทึกสถานะว่าทำแล้ว
+                                localStorage.setItem('web_evaluated', 'true');
+                                document.cookie = "web_evaluated=true; max-age=" + (60*60*24*365) + "; path=/"; 
+                                
+                                bootstrap.Modal.getInstance(document.getElementById('webSatisfactionModal')).hide();
+                                Swal.fire({
+                                    icon: 'success',
+                                    title: 'ขอบคุณครับ!',
+                                    text: 'ความคิดเห็นของคุณเป็นประโยชน์ต่อการพัฒนาระบบอย่างยิ่ง',
+                                    timer: 2500,
+                                    showConfirmButton: false
+                                });
+                            } else {
+                                Swal.fire('ผิดพลาด', data.message || 'ไม่สามารถบันทึกข้อมูลได้', 'error');
+                            }
+                        } catch (e) {
+                            console.error("Server Error:", text);
+                            Swal.fire('ผิดพลาดทางเซิร์ฟเวอร์', 'ไฟล์ API ตอบกลับไม่ถูกต้อง (กรุณาเช็ค Console)', 'error');
+                        }
+                    })
+                    .catch(err => {
+                        console.error("Fetch Error:", err);
+                        Swal.fire('ข้อผิดพลาดเครือข่าย', 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้', 'error');
+                    })
+                    .finally(() => {
+                        // คืนค่าปุ่มกลับมาเป็นปกติ
+                        btnSubmit.innerHTML = originalText;
+                        btnSubmit.classList.remove('disabled');
+                    });
+                }
+            });
+        });
+    </script>
+
     <?php if (isset($_GET['success']) && $_GET['success'] == 1): ?>
 
         <script>
@@ -506,6 +695,9 @@ try {
                 url.searchParams.delete('success');
                 url.searchParams.delete('mode');
                 window.history.replaceState({}, document.title, url);
+                
+                // โชว์หน้าต่างประเมินเว็บต่อทันทีหลังจากข้อความ "บันทึกสำเร็จ" หายไป
+                showWebSatisfactionModal();
             });
         </script>
 

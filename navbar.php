@@ -55,11 +55,18 @@ $nav_prefix = $nav_prefix ?? '';
                 <div class="text-white me-3 d-none d-md-block user-profile">
                     <i class="fas fa-user-circle me-1"></i> <?= htmlspecialchars($user_display_name) ?>
                 </div>
-            <a href="<?= $nav_prefix ?>logout.php" class="btn btn-outline-light btn-sm rounded-pill">
+            <?php endif; ?>
+
+            <a href="<?= $nav_prefix ?>manual.php" class="btn btn-outline-light btn-sm rounded-pill me-3 d-none d-md-block">
+                <i class="fas fa-book"></i> คู่มือการใช้งาน
+            </a>
+            
+            <?php if (!empty($_SESSION['is_logged_in'])): ?>
+                <a href="<?= $nav_prefix ?>logout.php" class="btn btn-outline-light btn-sm rounded-pill">
                     <i class="fas fa-sign-out-alt"></i> ออกจากระบบ
                 </a>
             <?php else: ?>
-            <a href="<?= $nav_prefix ?>login.php" class="btn btn-light btn-sm fw-bold px-3">เข้าสู่ระบบ</a>
+                <a href="<?= $nav_prefix ?>login.php" class="btn btn-light btn-sm fw-bold px-3">เข้าสู่ระบบ</a>
             <?php endif; ?>
         </div>
     </div>
@@ -76,6 +83,9 @@ $nav_prefix = $nav_prefix ?? '';
             <a href="<?= $nav_prefix ?>index.php" class="list-group-item list-group-item-action border-0 nav-link mx-2">
                 <i class="fas fa-home me-2 text-primary"></i> หน้าแรก
             </a>
+            <a href="<?= $nav_prefix ?>manual.php" class="list-group-item list-group-item-action border-0 nav-link mx-2">
+                <i class="fas fa-book me-2 text-success"></i> คู่มือการใช้งาน
+            </a>
             <a href="<?= $nav_prefix ?>supervision_start.php" class="list-group-item list-group-item-action border-0 nav-link mx-2">
                 <i class="fas fa-clipboard-list me-2 text-warning"></i> บันทึกการนิเทศ
             </a>
@@ -87,8 +97,8 @@ $nav_prefix = $nav_prefix ?? '';
             <a href="<?= $nav_prefix ?>graphs/satisfaction_dashboard.php?form_type=3" class="list-group-item list-group-item-action border-0 nav-link mx-2">
                 <i class="fas fa-bolt me-2 text-warning"></i> Quick Win
             </a>
-            <a href="<?= $nav_prefix ?>graphs/satisfaction_dashboard.php?form_type=personal" class="list-group-item list-group-item-action border-0 nav-link mx-2">
-                <i class="fas fa-chart-bar me-2 text-success"></i> สถิติรายบุคคล
+            <a href="<?= $nav_prefix ?>graphs/web_satisfaction_dashboard.php" class="list-group-item list-group-item-action border-0 nav-link mx-2">
+                <i class="fas fa-star me-2 text-primary"></i> ความพึงพอใจระบบเว็บ
             </a>
 
             <div class="px-4 py-2 mt-2 small text-muted text-uppercase fw-bold">จัดการข้อมูล</div>

@@ -196,6 +196,7 @@ $existing_images_db = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <title>แก้ไขข้อมูลการนิเทศ</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="../css/kpi_style.css">
     <link rel="stylesheet" href="../css/styles.css">
 
@@ -331,8 +332,15 @@ $existing_images_db = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
                         <div class="col-md-2">
                             <label class="fw-bold">ปีการศึกษา</label>
-                            <input type="text" class="form-control modern-input bg-light" value="<?= htmlspecialchars($session_data['academic_year']) ?>" readonly>
-                            <input type="hidden" name="academic_year" value="<?= $session_data['academic_year'] ?>">
+                            <select name="academic_year" class="form-select modern-input" required>
+                                <?php 
+                                $current_val = (int)$session_data['academic_year'];
+                                $opts = $academicYearOptions;
+                                if (!in_array($current_val, $opts)) { $opts[] = $current_val; sort($opts); }
+                                foreach ($opts as $y): ?>
+                                    <option value="<?= $y ?>" <?= ($y == $current_val) ? 'selected' : '' ?>><?= $y ?></option>
+                                <?php endforeach; ?>
+                            </select>
                         </div>
                     </div>
                 </div>
@@ -397,14 +405,15 @@ $existing_images_db = $stmt->fetchAll(PDO::FETCH_ASSOC);
             </div>
 
             <div class="text-center mb-5 d-flex justify-content-center gap-3">
-                <button type="button" class="btn btn-success btn-lg shadow" onclick="confirmSave()">💾 บันทึก</button>
-                <button type="button" class="btn btn-danger btn-lg shadow" onclick="history.back()">❌ ยกเลิก</button>
+                <button type="button" class="btn btn-modern btn-save shadow" onclick="confirmSave()">SAVE CHANGES</button>
+                <button type="button" class="btn btn-modern btn-delete shadow" onclick="history.back()">CANCEL</button>
             </div>
         </form>
 
     </div>
 
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 

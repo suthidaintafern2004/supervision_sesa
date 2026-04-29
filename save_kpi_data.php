@@ -19,41 +19,41 @@ if (!isset($_SESSION['user_id'])) {
 require_once __DIR__ . '/config/db_connect.php';
 
 /* =========================================================
-   MIGRATION: อัปเดตโครงสร้างฐานข้อมูลเพื่อแก้ปัญหา Error 1062 ข้อมูลซ้ำข้ามปี
+   AUTO-FIX DATABASE SCHEMA (ปรับปรุง Primary/Unique Key ให้รองรับ academic_year)
 ========================================================= */
 try {
-    $idx_stmt = $conn->query("SHOW INDEX FROM supervision_sessions WHERE Non_unique = 0 AND Key_name != 'PRIMARY'");
+    // 1. ตรวจสอบและแก้ไข PRIMARY KEY ของตาราง supervision_sessions
+    $stmt = $conn->query("SHOW KEYS FROM supervision_sessions WHERE Key_name = 'PRIMARY'");
+    $pk_cols = [];
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) { $pk_cols[] = $row['Column_name']; }
+    if (!empty($pk_cols) && !in_array('academic_year', $pk_cols)) {
+        $conn->exec("ALTER TABLE supervision_sessions DROP PRIMARY KEY, ADD PRIMARY KEY(t_pid, subject_code, inspection_time, academic_year)");
+    }
+
+    // 2. ลบ UNIQUE KEY เก่าที่ไม่มี academic_year ใน supervision_sessions
+    $stmt = $conn->query("SHOW INDEX FROM supervision_sessions WHERE Non_unique = 0 AND Key_name != 'PRIMARY'");
     $indexes = [];
-    if ($idx_stmt) {
-        while ($row = $idx_stmt->fetch(PDO::FETCH_ASSOC)) {
-            $indexes[$row['Key_name']][] = $row['Column_name'];
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) { $indexes[$row['Key_name']][] = $row['Column_name']; }
+    foreach ($indexes as $key_name => $columns) {
+        if (!in_array('academic_year', $columns)) {
+            $conn->exec("ALTER TABLE supervision_sessions DROP INDEX `$key_name`");
         }
-        $has_correct_index = false;
-        $wrong_indexes = [];
-        
-        foreach ($indexes as $key_name => $columns) {
-            if (in_array('t_pid', $columns) && in_array('subject_code', $columns) && in_array('inspection_time', $columns)) {
-                if (!in_array('academic_year', $columns)) {
-                    $wrong_indexes[] = $key_name; // เก็บชื่อ Index ที่ผิดไว้ก่อน
-                } else {
-                    $has_correct_index = true; // มี index ที่ถูกต้องอยู่แล้ว
-                }
-            }
-        }
-        
-        // 1. สร้าง Index ที่ถูกต้องก่อน (ป้องกัน Foreign Key error)
-        if (!$has_correct_index) {
-            try {
-                $conn->exec("ALTER TABLE `supervision_sessions` ADD UNIQUE KEY `uk_session_yearly` (`t_pid`, `subject_code`, `inspection_time`, `academic_year`)");
-            } catch (Exception $e) { }
-        }
-        
-        // 2. ค่อยลบ Index เก่าทิ้งทีหลัง
-        foreach ($wrong_indexes as $wrong_key) {
-            try {
-                $conn->exec("ALTER TABLE `supervision_sessions` DROP INDEX `$wrong_key`");
-            } catch (Exception $e) { }
-        }
+    }
+
+    // 3. แก้ไข PRIMARY KEY ของ kpi_answers
+    $stmt = $conn->query("SHOW KEYS FROM kpi_answers WHERE Key_name = 'PRIMARY'");
+    $pk_cols = [];
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) { $pk_cols[] = $row['Column_name']; }
+    if (!empty($pk_cols) && !in_array('academic_year', $pk_cols)) {
+        $conn->exec("ALTER TABLE kpi_answers DROP PRIMARY KEY, ADD PRIMARY KEY(question_id, t_pid, subject_code, inspection_time, academic_year)");
+    }
+
+    // 4. แก้ไข PRIMARY KEY ของ kpi_indicator_suggestions
+    $stmt = $conn->query("SHOW KEYS FROM kpi_indicator_suggestions WHERE Key_name = 'PRIMARY'");
+    $pk_cols = [];
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) { $pk_cols[] = $row['Column_name']; }
+    if (!empty($pk_cols) && !in_array('academic_year', $pk_cols)) {
+        $conn->exec("ALTER TABLE kpi_indicator_suggestions DROP PRIMARY KEY, ADD PRIMARY KEY(indicator_id, t_pid, subject_code, inspection_time, academic_year)");
     }
 } catch (Exception $e) {}
 
@@ -74,8 +74,14 @@ $overall_suggestion    = trim($_POST['overall_suggestion'] ?? '');
 $ratings               = $_POST['ratings'] ?? [];
 $indicator_suggestions = $_POST['indicator_suggestions'] ?? [];
 $inspection_time = (int)($_POST['inspection_time'] ?? 0);
-$academic_year   = (int)($_POST['academic_year'] ?? 0);
+$academic_year   = (int)($_POST['academic_year'] ?? $_SESSION['inspection_data']['academic_year'] ?? 0);
 $semester        = (int)($_POST['semester'] ?? 0);
+
+// กันกรณีปีการศึกษาไม่มีค่า ให้ใช้ปีปัจจุบันคำนวณสำรอง
+if ($academic_year < 2500) {
+    $academic_year = (int)date('Y') + 543;
+    if ((int)date('n') < 5) $academic_year--;
+}
 
 $subject_code_db = preg_replace('/\s+/', '', strtolower($subject_code));
 

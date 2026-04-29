@@ -1,11 +1,20 @@
 <?php
 // check_duplicate.php
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 require_once __DIR__ . '/config/db_connect.php';
 
 // รับค่าที่ส่งมาจาก JavaScript
 $t_pid           = $_POST['t_pid'] ?? '';
-$academic_year   = intval($_POST['academic_year'] ?? 0);
+$academic_year   = intval($_POST['academic_year'] ?? $_SESSION['inspection_data']['academic_year'] ?? 0);
 $form_type       = $_POST['form_type'] ?? 'classroom';
+
+// กันกรณีปีการศึกษาไม่มีค่า ให้ใช้ปีปัจจุบันคำนวณสำรอง
+if ($academic_year < 2500) {
+    $academic_year = (int)date('Y') + 543;
+    if ((int)date('n') < 5) $academic_year--;
+}
 
 if ($form_type === 'quickwin') {
     // ตรวจซ้ำสำหรับ Quick Win (1 ครั้ง / 1 ปีการศึกษา)

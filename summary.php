@@ -181,11 +181,15 @@ if (
 
     <div class="container my-4">
         <div class="card shadow-sm border-0">
-            <div class="card-header bg-primary text-white text-center py-3">
+            <div class="card-header bg-primary text-white text-center py-3 position-relative">
                 <h4 class="mb-0">
                     <i class="fas fa-clipboard-check me-2"></i>
                     แบบบันทึกการนิเทศการสอน (classroom)
                 </h4>
+                <!-- ปุ่มตัวช่วยสำหรับทดสอบระบบ (Auto Fill) -->
+                <button type="button" class="btn btn-warning btn-sm position-absolute shadow-sm" style="right: 15px; top: 15px; border-radius: 20px; font-weight: bold;" onclick="autoFillScores()">
+                    <i class="fas fa-magic"></i> สุ่มคะแนน (ทดสอบ)
+                </button>
             </div>
 
             <div class="card-body p-4">
@@ -206,6 +210,52 @@ if (
 
     <!-- Bootstrap JS สำหรับเปิด-ปิดเมนู Offcanvas -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        // ฟังชั่นสำหรับช่วยนักพัฒนา เติมข้อมูลอัตโนมัติเพื่อความรวดเร็วในการทดสอบ
+        function autoFillScores() {
+            // 1. สุ่มเลือก Radio Button (คะแนน) ทุกข้อ
+            const radioNames = new Set();
+            document.querySelectorAll('input[type="radio"]').forEach(r => radioNames.add(r.name));
+
+            radioNames.forEach(name => {
+                const radios = Array.from(document.querySelectorAll(`input[type="radio"][name="${name}"]`));
+                if (radios.length > 0) {
+                    // สุ่มเลือกเพื่อให้ได้ข้อมูลที่หลากหลายสำหรับการ Test กราฟ
+                    // (ถ้าต้องการให้ได้คะแนนเต็มตลอดให้เปลี่ยนเป็น radios[radios.length - 1].checked = true;)
+                    const rand = Math.floor(Math.random() * radios.length);
+                    radios[rand].checked = true;
+                }
+            });
+
+            // 2. เลือก Select Dropdown ทุกอัน (เช่น ครั้งที่นิเทศ, ภาคเรียน) อัตโนมัติ
+            document.querySelectorAll('select').forEach(sel => {
+                if (sel.value === '') {
+                    for (let i = 0; i < sel.options.length; i++) {
+                        if (sel.options[i].value !== '') {
+                            sel.selectedIndex = i;
+                            break;
+                        }
+                    }
+                }
+            });
+
+            // 3. เติมข้อความช่อง Textarea ทุกช่อง
+            document.querySelectorAll('textarea').forEach(ta => {
+                if(ta.value.trim() === '') {
+                    ta.value = 'ข้อมูลสำหรับการทดสอบระบบอัตโนมัติ (Auto Fill)';
+                }
+            });
+
+            Swal.fire({
+                icon: 'success',
+                title: 'เติมข้อมูลเรียบร้อย',
+                text: 'สุ่มคะแนนและกรอกข้อความสำหรับทดสอบให้ครบทุกช่องแล้ว!',
+                showConfirmButton: false,
+                timer: 1500
+            });
+        }
+    </script>
 </body>
 
 </html>

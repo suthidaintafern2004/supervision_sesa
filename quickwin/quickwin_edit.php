@@ -191,6 +191,7 @@ $images = $stmtImg->fetchAll(PDO::FETCH_ASSOC);
     <link rel="stylesheet" href="../css/quickwin_form.css">
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     <link href="https://cdn.jsdelivr.net/npm/@ttskch/select2-bootstrap-5-theme@1.5.2/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 
     <style>
         .btn-remove-custom {
@@ -216,10 +217,37 @@ $images = $stmtImg->fetchAll(PDO::FETCH_ASSOC);
             display: inline-block;
             width: 100%;
         }
+
+        /* Modern Buttons Style */
+        .btn-modern {
+            border-radius: 999px;
+            padding: 12px 28px;
+            font-size: 1.05rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            transition: all 0.25s ease;
+            border: none;
+        }
+        .btn-modern:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 18px rgba(0,0,0,0.15) !important;
+            color: #fff;
+        }
+        .btn-save {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: #fff;
+        }
+        .btn-delete {
+            background: linear-gradient(135deg, #dc3545, #ff6b6b);
+            color: #fff;
+        }
     </style>
 </head>
 
-<body>
+<body class="bg-light">
+    <?php $nav_prefix = '../'; include '../navbar.php'; ?>
+
     <div class="container my-5">
         <div class="row justify-content-center">
             <div class="col-lg-10">
@@ -345,10 +373,10 @@ $images = $stmtImg->fetchAll(PDO::FETCH_ASSOC);
                                 <div class="col-md-10 mx-auto">
                                     <div class="d-flex justify-content-center gap-3">
                                         <div class="col-md-6 mb-2">
-                                            <button type="submit" class="btn btn-success btn-lg w-100 shadow"><i class="fas fa-save me-2"></i> บันทึกการแก้ไข</button>
+                                            <button type="submit" class="btn btn-modern btn-save w-100 shadow">SAVE CHANGES</button>
                                         </div>
                                         <div class="col-md-6 mb-2">
-                                            <a href="../my_sessions_list.php" class="btn btn-danger btn-lg w-100 shadow"><i class="fas fa-arrow-left me-2"></i> ย้อนกลับ</a>
+                                            <a href="../my_sessions_list.php" class="btn btn-modern btn-delete w-100 shadow">CANCEL</a>
                                         </div>
                                     </div>
                                 </div>
@@ -360,6 +388,7 @@ $images = $stmtImg->fetchAll(PDO::FETCH_ASSOC);
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>

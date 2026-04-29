@@ -17,6 +17,24 @@ if (session_status() === PHP_SESSION_NONE) {
 
 require_once '../config/db_connect.php';
 
+/* =========================================================
+   AUTO-FIX DATABASE SCHEMA: แก้ไขคอลัมน์ให้รองรับการเก็บ "เวลา"
+========================================================= */
+try {
+    // เปลี่ยนชนิดคอลัมน์จาก DATE เป็น DATETIME เพื่อให้เก็บทั้งวันและเวลาได้
+    $stmt = $conn->query("SHOW COLUMNS FROM supervision_sessions LIKE 'satisfaction_date'");
+    $col = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($col && strtoupper($col['Type']) === 'DATE') {
+        $conn->exec("ALTER TABLE supervision_sessions MODIFY satisfaction_date DATETIME NULL");
+    }
+
+    $stmt = $conn->query("SHOW COLUMNS FROM quick_win LIKE 'satisfaction_date'");
+    $col = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($col && strtoupper($col['Type']) === 'DATE') {
+        $conn->exec("ALTER TABLE quick_win MODIFY satisfaction_date DATETIME NULL");
+    }
+} catch (Exception $e) {}
+
 /* ===============================
    function: คำนวณปีการศึกษา
 =============================== */
@@ -130,7 +148,7 @@ try {
             UPDATE supervision_sessions
             SET satisfaction_suggestion = ?,
                 satisfaction_submitted  = 1,
-                satisfaction_date       = ?
+                satisfaction_date       = NOW()
             WHERE p_id = ?
               AND t_pid   = ?
               AND subject_code    = ?
@@ -139,7 +157,6 @@ try {
         ");
         $stmt->execute([
             $suggestion,
-            $current_datetime,
             $c['s_pid'],
             $c['t_pid'],
             $c['sub_code'],
@@ -199,7 +216,7 @@ try {
             UPDATE quick_win
             SET satisfaction_suggestion = ?,
                 satisfaction_submitted  = 1,
-                satisfaction_date       = ?
+                satisfaction_date       = NOW()
             WHERE t_pid = ?
               AND p_id  = ?
               AND supervision_date = ?
@@ -207,7 +224,6 @@ try {
         ");
         $stmt->execute([
             $suggestion,
-            $current_datetime,
             $c['t_pid'],
             $c['p_id'],
             $c['date'],

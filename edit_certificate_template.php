@@ -56,6 +56,13 @@ try {
 // Handle POST Actions
 // =======================
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // ดักจับกรณีไฟล์ใหญ่เกิน post_max_size (เซิร์ฟเวอร์บนโฮสต์ตัด Request ทิ้ง ทำให้ $_POST ว่างเปล่า)
+    if (empty($_POST) && $_SERVER['CONTENT_LENGTH'] > 0) {
+        $_SESSION['flash_error'] = 'ไฟล์ภาพมีขนาดใหญ่เกินกว่าที่เซิร์ฟเวอร์บนโฮสต์อนุญาต (post_max_size)';
+        header("Location: edit_certificate_template.php");
+        exit;
+    }
+
     $action = $_POST['action'] ?? '';
     
     if ($action === 'create_new_year') {
@@ -83,12 +90,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     if ($action === 'upload_bg' && $academic_year) {
         $form_type = $_POST['form_type'];
-        if (isset($_FILES['bg_image']) && $_FILES['bg_image']['error'] == 0) {
-            $ext = pathinfo($_FILES['bg_image']['name'], PATHINFO_EXTENSION);
-            $filename = "bg_{$form_type}_{$academic_year}_" . time() . ".$ext";
-            move_uploaded_file($_FILES['bg_image']['tmp_name'], $upload_dir . $filename);
-            $stmt = $conn->prepare("REPLACE INTO cert_settings (form_type, academic_year, bg_image) VALUES (?, ?, ?)");
-            $stmt->execute([$form_type, $academic_year, $filename]);
+        if (isset($_FILES['bg_image'])) {
+            if ($_FILES['bg_image']['error'] === UPLOAD_ERR_OK) {
+                $ext = pathinfo($_FILES['bg_image']['name'], PATHINFO_EXTENSION);
+                $filename = "bg_{$form_type}_{$academic_year}_" . time() . ".$ext";
+                if (move_uploaded_file($_FILES['bg_image']['tmp_name'], $upload_dir . $filename)) {
+                    $stmt = $conn->prepare("REPLACE INTO cert_settings (form_type, academic_year, bg_image) VALUES (?, ?, ?)");
+                    $stmt->execute([$form_type, $academic_year, $filename]);
+                    $_SESSION['flash_success'] = 'อัปโหลดภาพพื้นหลังสำเร็จ';
+                } else {
+                    $_SESSION['flash_error'] = 'อัปโหลดล้มเหลว: ไม่สามารถบันทึกไฟล์ได้ (กรุณาเช็ค Permission โฟลเดอร์ uploads)';
+                }
+            } else {
+                $err = $_FILES['bg_image']['error'];
+                $msg = "เกิดข้อผิดพลาดรหัส $err";
+                if ($err == UPLOAD_ERR_INI_SIZE || $err == UPLOAD_ERR_FORM_SIZE) $msg = 'ไฟล์มีขนาดใหญ่เกินกว่าที่เซิร์ฟเวอร์อนุญาต (upload_max_filesize)';
+                $_SESSION['flash_error'] = $msg;
+            }
         }
         header("Location: edit_certificate_template.php?academic_year=" . $academic_year . "&tab=" . $form_type);
         exit;
@@ -136,6 +154,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header("Location: edit_certificate_template.php?academic_year=" . $del_year);
         exit;
     }
+}
+
+// =======================
+// Flash Messages
+// =======================
+$flash_error = $_SESSION['flash_error'] ?? null;
+$flash_success = $_SESSION['flash_success'] ?? null;
+if ($flash_error || $flash_success) {
+    unset($_SESSION['flash_error']);
+    unset($_SESSION['flash_success']);
 }
 
 // =======================
@@ -343,7 +371,8 @@ if (!array_key_exists($active_tab, $types)) $active_tab = 'classroom';
                             <div class="tab-pane fade <?= ($active_tab === $key) ? 'show active' : '' ?>" id="tab-<?= $key ?>">
                                 <div class="card border-0 shadow-sm rounded-4 mb-4">
                                     <div class="card-body p-4 text-center">
-                                        <h6 class="fw-bold mb-3 text-start"><i class="fas fa-image me-2 text-primary"></i> พื้นหลัง <?= $name ?></h6>
+                                        <h6 class="fw-bold mb-1 text-start"><i class="fas fa-image me-2 text-primary"></i> พื้นหลัง <?= $name ?></h6>
+                                        <div class="text-start text-muted small mb-3">แนะนำ: ไฟล์ภาพ .jpg หรือ .png ขนาดไม่เกิน 1MB (สัดส่วน A4 แนวนอน)</div>
                                         <form method="POST" enctype="multipart/form-data" class="d-flex gap-2">
                                             <input type="hidden" name="action" value="upload_bg">
                                             <input type="hidden" name="academic_year" value="<?= $selected_year ?>">
@@ -469,6 +498,14 @@ if (!array_key_exists($active_tab, $types)) $active_tab = 'classroom';
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <?php if ($flash_error): ?>
+    <script>Swal.fire({icon: 'error', title: 'ไม่สามารถอัปโหลดได้', text: '<?= $flash_error ?>'});</script>
+    <?php endif; ?>
+    
+    <?php if ($flash_success): ?>
+    <script>Swal.fire({icon: 'success', title: 'สำเร็จ', text: '<?= $flash_success ?>', timer: 2000, showConfirmButton: false});</script>
+    <?php endif; ?>
     
     <?php if ($selected_year): ?>
     <script>

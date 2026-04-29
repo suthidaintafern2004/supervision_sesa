@@ -304,6 +304,7 @@ $academicYears = $conn->query($yearSql)->fetchAll(PDO::FETCH_COLUMN);
                                         <input type="hidden" name="t_pid" value="<?= $r['t_pid'] ?>">
                                         <input type="hidden" name="subject_code" value="<?= $r['subject_code'] ?>">
                                         <input type="hidden" name="inspection_time" value="<?= $r['inspection_time'] ?>">
+                                        <input type="hidden" name="academic_year" value="<?= $r['academic_year'] ?>">
                                         <button type="button" class="btn btn-sm btn-light text-danger shadow-sm"><i class="fas fa-trash"></i></button>
                                     </form>
                                 <?php else: ?>
@@ -317,6 +318,7 @@ $academicYears = $conn->query($yearSql)->fetchAll(PDO::FETCH_COLUMN);
                                         <input type="hidden" name="p_id" value="<?= $r['supervisor_p_id'] ?>">
                                         <input type="hidden" name="t_pid" value="<?= $r['t_pid'] ?>">
                                         <input type="hidden" name="supervision_date" value="<?= $r['supervision_date'] ?>">
+                                        <input type="hidden" name="academic_year" value="<?= $r['academic_year'] ?>">
                                         <button type="button" class="btn btn-sm btn-light text-danger shadow-sm"><i class="fas fa-trash"></i></button>
                                     </form>
                                 <?php endif; ?>

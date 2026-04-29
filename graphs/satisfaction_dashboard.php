@@ -444,12 +444,16 @@ try {
                         ticks: {
                             maxRotation: 45,
                             minRotation: 45,
-                            font: { size: 11 }
+                            font: {
+                                size: 11
+                            }
                         }
                     },
                     y: {
                         beginAtZero: true,
-                        ticks: { stepSize: 1 }
+                        ticks: {
+                            stepSize: 1
+                        }
                     }
                 }
             }
